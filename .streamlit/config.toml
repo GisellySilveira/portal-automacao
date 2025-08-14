@@ -1,15 +1,4 @@
 [theme]
-# Cor principal (botões, links): um rosa vibrante para chamar a atenção
-primaryColor="#E0218A"
-
-# Cor de fundo principal: um rosa bem escuro, quase roxo, para não cansar a vista
-backgroundColor="#3D1229"
-
-# Cor de fundo secundária (barra lateral): um tom de rosa um pouco mais claro que o fundo
-secondaryBackgroundColor="#5C1B3E"
-
-# Cor do texto principal: um rosa bem claro, quase branco, para garantir a legibilidade
-textColor="#FDE0EF"
-
-# Fonte
-font="sans serif"
+base="light"
+primaryColor="#ff4bdd"
+secondaryBackgroundColor="#f4f0f6"
