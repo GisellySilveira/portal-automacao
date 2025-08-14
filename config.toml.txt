@@ -1,0 +1,15 @@
+[theme]
+# Cor primária (botões, links, etc.) - Um tom de rosa vibrante
+primaryColor="#FF69B4"
+
+# Cor de fundo principal - Um cinza bem escuro para manter o estilo dark
+backgroundColor="#1E1E2E"
+
+# Cor de fundo secundária (barra lateral) - Um cinza um pouco mais claro
+secondaryBackgroundColor="#2D2D44"
+
+# Cor do texto principal
+textColor="#FFFFFF"
+
+# Fonte (pode manter a padrão)
+font="sans serif"
