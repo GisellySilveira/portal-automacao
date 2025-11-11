@@ -50,37 +50,44 @@ elif escolha_topico == "Tabelas de Frete":
     # --- MENU EXPANSÍVEL PARA A FEDEX ---
     with st.expander("✈️ FedEx", expanded=True):
         
-        tab_fedex_usa, tab_fedex_br = st.tabs(["FedEx USA", "FedEx Brasil"])
+        tab_fedex_usa, tab_fedex_br = st.tabs(["FedEx Internacional", "FedEx Brasil"])
 
         with tab_fedex_usa:
             col_logo_usa, col_uploader_usa = st.columns([1, 2])
             with col_logo_usa:
                 st.image("logo_fedex.png", width=150)
             with col_uploader_usa:
-                st.subheader("Processador de Modelo Excel (USA)")
-                arquivo_excel_usa = st.file_uploader("Escolha a planilha FedEx USA", key="fedex_usa_excel")
+                st.subheader("Processador de Modelo Excel")
+                st.markdown("📋 **Formato esperado:** Excel com abas `Priority`, `Economy`, `CP` e respectivas abas de zonas")
+                arquivo_excel_usa = st.file_uploader("Escolha a planilha FedEx", type=["xlsx", "xls"], key="fedex_usa_excel")
                 
                 # --- BOTÃO E LÓGICA DE PROCESSAMENTO AQUI ---
                 if arquivo_excel_usa:
-                    if st.button("Processar FedEx USA", key="btn_fedex_usa"):
-                        with st.spinner("Aguarde... Processando a planilha..."):
+                    if st.button("Processar FedEx", key="btn_fedex_usa"):
+                        with st.spinner("Aguarde... Processando a planilha FedEx..."):
                             try:
-                                arquivos_gerados = processar_arquivo_excel(arquivo_excel_usa)
+                                arquivos_gerados = processar_arquivo_excel(arquivo_excel_usa, transportadora='FEDEX')
                                 if arquivos_gerados:
                                     zip_buffer = io.BytesIO()
                                     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zf:
                                         for arquivo in arquivos_gerados:
                                             zf.writestr(arquivo['nome'], arquivo['dados'])
                                     
-                                    st.success("Planilha processada com sucesso!")
+                                    st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
                                     st.download_button(
-                                        label="✔️ Baixar Arquivos (.zip)", data=zip_buffer.getvalue(),
-                                        file_name="resultados_FedEx_USA.zip", mime="application/zip"
+                                        label="📥 Baixar Todos os Arquivos (.zip)", 
+                                        data=zip_buffer.getvalue(),
+                                        file_name="resultados_FedEx.zip", 
+                                        mime="application/zip",
+                                        use_container_width=True
                                     )
                                 else:
                                     st.warning("Nenhum arquivo foi gerado.")
                             except Exception as e:
-                                st.error(f"Ocorreu um erro: {e}")
+                                st.error(f"❌ Ocorreu um erro: {e}")
+                                import traceback
+                                with st.expander("Detalhes do erro"):
+                                    st.code(traceback.format_exc())
 
         with tab_fedex_br:
             col_logo_br, col_uploader_br = st.columns([1, 2])
@@ -100,13 +107,77 @@ elif escolha_topico == "Tabelas de Frete":
 
     # --- MENU EXPANSÍVEL PARA A UPS ---
     with st.expander("📦 UPS"):
-        # (Estrutura similar com botões aqui)
-        st.info("Funcionalidade em desenvolvimento...")
+        col_logo_ups, col_uploader_ups = st.columns([1, 2])
+        with col_logo_ups:
+            st.image("logo_ups.png", width=150)
+        with col_uploader_ups:
+            st.subheader("Processador de Modelo Excel")
+            st.markdown("📋 **Formato esperado:** Excel com abas `Express`, `Standard` e respectivas abas de zonas")
+            arquivo_excel_ups = st.file_uploader("Escolha a planilha UPS", type=["xlsx", "xls"], key="ups_excel")
+            
+            if arquivo_excel_ups:
+                if st.button("Processar UPS", key="btn_ups"):
+                    with st.spinner("Aguarde... Processando a planilha UPS..."):
+                        try:
+                            arquivos_gerados = processar_arquivo_excel(arquivo_excel_ups, transportadora='UPS')
+                            if arquivos_gerados:
+                                zip_buffer = io.BytesIO()
+                                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zf:
+                                    for arquivo in arquivos_gerados:
+                                        zf.writestr(arquivo['nome'], arquivo['dados'])
+                                
+                                st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
+                                st.download_button(
+                                    label="📥 Baixar Todos os Arquivos (.zip)", 
+                                    data=zip_buffer.getvalue(),
+                                    file_name="resultados_UPS.zip", 
+                                    mime="application/zip",
+                                    use_container_width=True
+                                )
+                            else:
+                                st.warning("Nenhum arquivo foi gerado.")
+                        except Exception as e:
+                            st.error(f"❌ Ocorreu um erro: {e}")
+                            import traceback
+                            with st.expander("Detalhes do erro"):
+                                st.code(traceback.format_exc())
 
     # --- MENU EXPANSÍVEL PARA A DHL ---
     with st.expander("🚚 DHL"):
-        # (Estrutura similar com botões aqui)
-        st.info("Funcionalidade em desenvolvimento...")
+        col_logo_dhl, col_uploader_dhl = st.columns([1, 2])
+        with col_logo_dhl:
+            st.image("logo_dhl.png", width=150)
+        with col_uploader_dhl:
+            st.subheader("Processador de Modelo Excel")
+            st.markdown("📋 **Formato esperado:** Excel com aba `dhl` e aba de zonas `zonas dhl`")
+            arquivo_excel_dhl = st.file_uploader("Escolha a planilha DHL", type=["xlsx", "xls"], key="dhl_excel")
+            
+            if arquivo_excel_dhl:
+                if st.button("Processar DHL", key="btn_dhl"):
+                    with st.spinner("Aguarde... Processando a planilha DHL..."):
+                        try:
+                            arquivos_gerados = processar_arquivo_excel(arquivo_excel_dhl, transportadora='DHL')
+                            if arquivos_gerados:
+                                zip_buffer = io.BytesIO()
+                                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zf:
+                                    for arquivo in arquivos_gerados:
+                                        zf.writestr(arquivo['nome'], arquivo['dados'])
+                                
+                                st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
+                                st.download_button(
+                                    label="📥 Baixar Todos os Arquivos (.zip)", 
+                                    data=zip_buffer.getvalue(),
+                                    file_name="resultados_DHL.zip", 
+                                    mime="application/zip",
+                                    use_container_width=True
+                                )
+                            else:
+                                st.warning("Nenhum arquivo foi gerado.")
+                        except Exception as e:
+                            st.error(f"❌ Ocorreu um erro: {e}")
+                            import traceback
+                            with st.expander("Detalhes do erro"):
+                                st.code(traceback.format_exc())
         
 elif escolha_topico == "RECOM":
     st.header("Módulo RECOM")
