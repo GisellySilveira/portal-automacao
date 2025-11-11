@@ -46,6 +46,25 @@ if escolha_topico == "Página Inicial":
 elif escolha_topico == "Tabelas de Frete":
     st.header("Ferramentas de Processamento de Tabelas de Frete")
     st.write("Selecione uma das opções abaixo para iniciar o processamento.")
+    
+    # Botão para baixar modelo Excel
+    st.markdown("---")
+    col_info, col_download = st.columns([2, 1])
+    with col_info:
+        st.info("📥 **Precisa de um modelo?** Baixe o arquivo Excel modelo para preencher corretamente.")
+    with col_download:
+        try:
+            with open("MODELO_TABELA_FRETE.xlsx", "rb") as f:
+                st.download_button(
+                    label="📥 Baixar Modelo Excel",
+                    data=f,
+                    file_name="MODELO_TABELA_FRETE.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+        except FileNotFoundError:
+            st.warning("Modelo não encontrado")
+    st.markdown("---")
 
     # --- MENU EXPANSÍVEL PARA A FEDEX ---
     with st.expander("✈️ FedEx", expanded=True):
@@ -59,6 +78,13 @@ elif escolha_topico == "Tabelas de Frete":
             with col_uploader_usa:
                 st.subheader("Processador de Modelo Excel")
                 st.markdown("📋 **Formato esperado:** Excel com abas `Priority`, `Economy`, `CP` e respectivas abas de zonas")
+                
+                # Campos de configuração
+                nome_cliente_fedex = st.text_input("Nome do Cliente (opcional):", key="nome_cliente_fedex", 
+                                                   placeholder="Ex: ClienteXYZ")
+                adicionar_margem_fedex = st.checkbox("Gerar arquivos com margem (Lap, Special, Partner, etc.)", 
+                                                     value=True, key="margem_fedex")
+                
                 arquivo_excel_usa = st.file_uploader("Escolha a planilha FedEx", type=["xlsx", "xls"], key="fedex_usa_excel")
                 
                 # --- BOTÃO E LÓGICA DE PROCESSAMENTO AQUI ---
@@ -66,7 +92,12 @@ elif escolha_topico == "Tabelas de Frete":
                     if st.button("Processar FedEx", key="btn_fedex_usa"):
                         with st.spinner("Aguarde... Processando a planilha FedEx..."):
                             try:
-                                arquivos_gerados = processar_arquivo_excel(arquivo_excel_usa, transportadora='FEDEX')
+                                arquivos_gerados = processar_arquivo_excel(
+                                    arquivo_excel_usa, 
+                                    transportadora='FEDEX',
+                                    nome_cliente=nome_cliente_fedex,
+                                    adicionar_margem=adicionar_margem_fedex
+                                )
                                 if arquivos_gerados:
                                     zip_buffer = io.BytesIO()
                                     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zf:
@@ -113,13 +144,25 @@ elif escolha_topico == "Tabelas de Frete":
         with col_uploader_ups:
             st.subheader("Processador de Modelo Excel")
             st.markdown("📋 **Formato esperado:** Excel com abas `Express`, `Standard` e respectivas abas de zonas")
+            
+            # Campos de configuração
+            nome_cliente_ups = st.text_input("Nome do Cliente (opcional):", key="nome_cliente_ups", 
+                                            placeholder="Ex: ClienteXYZ")
+            adicionar_margem_ups = st.checkbox("Gerar arquivos com margem (Lap, Special, Partner, etc.)", 
+                                              value=True, key="margem_ups")
+            
             arquivo_excel_ups = st.file_uploader("Escolha a planilha UPS", type=["xlsx", "xls"], key="ups_excel")
             
             if arquivo_excel_ups:
                 if st.button("Processar UPS", key="btn_ups"):
                     with st.spinner("Aguarde... Processando a planilha UPS..."):
                         try:
-                            arquivos_gerados = processar_arquivo_excel(arquivo_excel_ups, transportadora='UPS')
+                            arquivos_gerados = processar_arquivo_excel(
+                                arquivo_excel_ups, 
+                                transportadora='UPS',
+                                nome_cliente=nome_cliente_ups,
+                                adicionar_margem=adicionar_margem_ups
+                            )
                             if arquivos_gerados:
                                 zip_buffer = io.BytesIO()
                                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zf:
@@ -150,13 +193,25 @@ elif escolha_topico == "Tabelas de Frete":
         with col_uploader_dhl:
             st.subheader("Processador de Modelo Excel")
             st.markdown("📋 **Formato esperado:** Excel com aba `dhl` e aba de zonas `zonas dhl`")
+            
+            # Campos de configuração
+            nome_cliente_dhl = st.text_input("Nome do Cliente (opcional):", key="nome_cliente_dhl", 
+                                            placeholder="Ex: ClienteXYZ")
+            adicionar_margem_dhl = st.checkbox("Gerar arquivos com margem (Lap, Special, Partner, etc.)", 
+                                              value=True, key="margem_dhl")
+            
             arquivo_excel_dhl = st.file_uploader("Escolha a planilha DHL", type=["xlsx", "xls"], key="dhl_excel")
             
             if arquivo_excel_dhl:
                 if st.button("Processar DHL", key="btn_dhl"):
                     with st.spinner("Aguarde... Processando a planilha DHL..."):
                         try:
-                            arquivos_gerados = processar_arquivo_excel(arquivo_excel_dhl, transportadora='DHL')
+                            arquivos_gerados = processar_arquivo_excel(
+                                arquivo_excel_dhl, 
+                                transportadora='DHL',
+                                nome_cliente=nome_cliente_dhl,
+                                adicionar_margem=adicionar_margem_dhl
+                            )
                             if arquivos_gerados:
                                 zip_buffer = io.BytesIO()
                                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zf:
@@ -168,6 +223,57 @@ elif escolha_topico == "Tabelas de Frete":
                                     label="📥 Baixar Todos os Arquivos (.zip)", 
                                     data=zip_buffer.getvalue(),
                                     file_name="resultados_DHL.zip", 
+                                    mime="application/zip",
+                                    use_container_width=True
+                                )
+                            else:
+                                st.warning("Nenhum arquivo foi gerado.")
+                        except Exception as e:
+                            st.error(f"❌ Ocorreu um erro: {e}")
+                            import traceback
+                            with st.expander("Detalhes do erro"):
+                                st.code(traceback.format_exc())
+    
+    # --- MENU EXPANSÍVEL PARA OUTRAS TRANSPORTADORAS ---
+    with st.expander("📮 Outras Transportadoras"):
+        st.markdown("### Processador Genérico")
+        st.info("⚠️ **Atenção:** Esta opção processa qualquer transportadora. Certifique-se de que o arquivo Excel segue o formato padrão.")
+        
+        col_config, col_upload = st.columns([1, 2])
+        
+        with col_config:
+            st.markdown("**Configurações:**")
+            nome_cliente_outras = st.text_input("Nome do Cliente (opcional):", key="nome_cliente_outras", 
+                                               placeholder="Ex: ClienteXYZ")
+            adicionar_margem_outras = st.checkbox("Gerar arquivos com margem (Lap, Special, Partner, etc.)", 
+                                                 value=True, key="margem_outras")
+        
+        with col_upload:
+            st.markdown("**Upload do Arquivo:**")
+            arquivo_excel_outras = st.file_uploader("Escolha a planilha da transportadora", 
+                                                   type=["xlsx", "xls"], key="outras_excel")
+            
+            if arquivo_excel_outras:
+                if st.button("Processar Transportadora", key="btn_outras"):
+                    with st.spinner("Aguarde... Processando a planilha..."):
+                        try:
+                            arquivos_gerados = processar_arquivo_excel(
+                                arquivo_excel_outras, 
+                                transportadora='OUTRAS',
+                                nome_cliente=nome_cliente_outras,
+                                adicionar_margem=adicionar_margem_outras
+                            )
+                            if arquivos_gerados:
+                                zip_buffer = io.BytesIO()
+                                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zf:
+                                    for arquivo in arquivos_gerados:
+                                        zf.writestr(arquivo['nome'], arquivo['dados'])
+                                
+                                st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
+                                st.download_button(
+                                    label="📥 Baixar Todos os Arquivos (.zip)", 
+                                    data=zip_buffer.getvalue(),
+                                    file_name="resultados_Outras.zip", 
                                     mime="application/zip",
                                     use_container_width=True
                                 )
