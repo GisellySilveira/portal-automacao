@@ -52,6 +52,18 @@ CONFIGURACOES_TRANSPORTADORAS = {
             'A': 1, 'B': 1, 'C': 2, 'D': 2, 'E': 3, 'F': 3, 'G': 3, 'H': 4,
             'I': 4, 'R': 4, 'S': 4, 'V': 5, 'W': 5, 'X': 5
         }
+    },
+    'OUTRAS': {
+        'abas_preco': ['Servico1', 'Servico2', 'Servico3'],  # Nomes genéricos - serão detectados automaticamente
+        'mapa_abas_zonas': {},  # Será preenchido dinamicamente
+        'mapa_zonas_priority': {
+            'A': 1, 'B': 1, 'C': 2, 'D': 2, 'E': 3, 'F': 3, 'G': 3, 'H': 4,
+            'I': 4, 'R': 4, 'S': 4, 'T': 5, 'U': 5, 'V': 5, 'W': 5, 'X': 5, 'Y': 5
+        },
+        'mapa_zonas_economy_cp': {
+            'A': 1, 'B': 1, 'C': 2, 'D': 2, 'E': 3, 'F': 3, 'G': 3, 'H': 4,
+            'I': 4, 'R': 4, 'S': 4, 'V': 5, 'W': 5, 'X': 5
+        }
     }
 }
 
@@ -126,23 +138,37 @@ def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis,
 
 
 # --- FUNÇÃO PARA APLICAR MARGENS E CRIAR ARQUIVOS EM MEMÓRIA ---
-def aplicar_margens_e_criar_arquivos_em_memoria(df_base, nome_base_arquivo):
+def aplicar_margens_e_criar_arquivos_em_memoria(df_base, nome_base_arquivo, adicionar_margem=True):
     """
     Aplica diferentes margens e cria arquivos CSV em memória para cada plano
+    
+    Args:
+        df_base: DataFrame base
+        nome_base_arquivo: Nome base para os arquivos
+        adicionar_margem: Se True, gera arquivos com margens. Se False, gera apenas arquivo base.
     """
     if df_base.empty:
         return []
     
     arquivos_gerados = []
     
-    # Primeiro salva a versão sem margem (base)
+    # Prepara o dataframe base
     df_sem_margem = df_base.copy()
     df_sem_margem['country'] = df_sem_margem['country'].apply(unidecode.unidecode)
+    
+    # Se NÃO adicionar margem, gera apenas um arquivo
+    if not adicionar_margem:
+        csv_string = df_sem_margem.to_csv(index=False, sep=';', decimal='.', 
+                                         float_format='%.10g', encoding='cp1252')
+        arquivos_gerados.append({'nome': f"{nome_base_arquivo}.csv", 'dados': csv_string})
+        return arquivos_gerados
+    
+    # Se adicionar margem, gera todos os arquivos
     csv_string = df_sem_margem.to_csv(index=False, sep=';', decimal='.', 
                                      float_format='%.10g', encoding='cp1252')
     arquivos_gerados.append({'nome': f"{nome_base_arquivo}_Base.csv", 'dados': csv_string})
     
-    # Agora aplica as margens
+    # Aplica as margens
     plano = ['Lap', 'Special', 'Partner', 'Pro', 'Scaleup', 'Startup']
     margem = [1, 1.15, 1.2, 1.33, 1.4, 1.7, 1.9]
     colunas_margem = ['price', 'exceeding_price_300', 'exceeding_price_1000']
@@ -163,13 +189,15 @@ def aplicar_margens_e_criar_arquivos_em_memoria(df_base, nome_base_arquivo):
 
 
 # --- FUNÇÃO PRINCIPAL DE PROCESSAMENTO ---
-def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX'):
+def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome_cliente='', adicionar_margem=True):
     """
     Processa arquivo Excel de tabelas de frete de acordo com a transportadora escolhida
     
     Args:
         arquivo_excel_recebido: Arquivo Excel (pode ser path ou file object)
-        transportadora: 'FEDEX', 'UPS', 'DHL', etc.
+        transportadora: 'FEDEX', 'UPS', 'DHL', 'OUTRAS', etc.
+        nome_cliente: Nome do cliente (opcional) para personalizar nome dos arquivos
+        adicionar_margem: Se True, gera arquivos com diferentes margens. Se False, gera apenas arquivo base.
     
     Returns:
         Lista de dicionários com {'nome': nome_arquivo, 'dados': conteudo_csv}
@@ -196,8 +224,24 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX'):
         
         print(f"Nome base do arquivo: {nome_base_excel}")
         
-        # Processa cada aba de preços
-        abas_de_preco = config['abas_preco']
+        # Para "OUTRAS" transportadoras, detecta automaticamente as abas
+        if transportadora.upper() == 'OUTRAS':
+            # Identifica abas de preço (todas exceto as que contêm "zona" no nome)
+            abas_de_preco = [aba for aba in xls.sheet_names if 'zona' not in aba.lower() and 'zone' not in aba.lower()]
+            print(f"Abas de preço detectadas automaticamente: {abas_de_preco}")
+            
+            # Tenta identificar abas de zonas correspondentes
+            config['mapa_abas_zonas'] = {}
+            for aba_preco in abas_de_preco:
+                # Procura por uma aba de zona com nome similar
+                for aba_zona in xls.sheet_names:
+                    if ('zona' in aba_zona.lower() or 'zone' in aba_zona.lower()):
+                        # Usa a primeira aba de zona encontrada como padrão
+                        config['mapa_abas_zonas'][aba_preco] = aba_zona
+                        break
+        else:
+            # Processa cada aba de preços conforme configurado
+            abas_de_preco = config['abas_preco']
         
         for nome_da_aba in abas_de_preco:
             # Verifica se a aba existe no arquivo
@@ -440,18 +484,30 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX'):
             tabela_doc_final.drop(columns=['Tipo', 'range_start', 'Zona_Letra'], inplace=True, errors='ignore')
             tabela_not_doc_final.drop(columns=['Tipo', 'range_start', 'Zona_Letra'], inplace=True, errors='ignore')
             
-            # Define nomes base para os arquivos
-            nome_base_arquivo = nome_da_aba.replace(' ', '_')
-            caminho_base_doc = f"{transportadora}_{nome_base_excel}_{nome_base_arquivo}_docTable"
-            caminho_base_not_doc = f"{transportadora}_{nome_base_excel}_{nome_base_arquivo}_notDocTable"
+            # Define nomes base para os arquivos seguindo o novo padrão
+            # Formato: [nome_cliente_]doc_[transportadora]Table ou [nome_cliente_]notDoc_[transportadora]Table
+            prefixo_cliente = f"{nome_cliente}_" if nome_cliente else ""
+            sufixo_margem = "_margem" if adicionar_margem else ""
             
-            # Gera arquivos com margens
-            print("   - Aplicando margens e criando arquivos 'docTable'...")
-            arquivos_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_doc_final, caminho_base_doc)
+            transportadora_lower = transportadora.lower()
+            caminho_base_doc = f"{prefixo_cliente}doc_{transportadora_lower}Table{sufixo_margem}"
+            caminho_base_not_doc = f"{prefixo_cliente}notDoc_{transportadora_lower}Table{sufixo_margem}"
+            
+            # Gera arquivos com ou sem margens
+            if adicionar_margem:
+                print("   - Aplicando margens e criando arquivos 'docTable'...")
+            else:
+                print("   - Criando arquivos 'docTable' (sem margem)...")
+            
+            arquivos_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_doc_final, caminho_base_doc, adicionar_margem)
             todos_os_arquivos_finais.extend(arquivos_doc)
             
-            print("   - Aplicando margens e criando arquivos 'notDocTable'...")
-            arquivos_not_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_not_doc_final, caminho_base_not_doc)
+            if adicionar_margem:
+                print("   - Aplicando margens e criando arquivos 'notDocTable'...")
+            else:
+                print("   - Criando arquivos 'notDocTable' (sem margem)...")
+                
+            arquivos_not_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_not_doc_final, caminho_base_not_doc, adicionar_margem)
             todos_os_arquivos_finais.extend(arquivos_not_doc)
             
             print(f"\n   [OK] Aba '{nome_da_aba}' processada com sucesso!")
