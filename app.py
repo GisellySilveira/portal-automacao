@@ -68,35 +68,46 @@ elif escolha_topico == "Tabelas de Frete":
 
     # --- MENU EXPANSÍVEL PARA A FEDEX ---
     with st.expander("✈️ FedEx", expanded=True):
-        
-        tab_fedex_usa, tab_fedex_br = st.tabs(["FedEx Internacional", "FedEx Brasil"])
-
-        with tab_fedex_usa:
-            col_logo_usa, col_uploader_usa = st.columns([1, 2])
-            with col_logo_usa:
-                st.image("logo_fedex.png", width=150)
-            with col_uploader_usa:
-                st.subheader("Processador de Modelo Excel")
-                st.markdown("📋 **Formato esperado:** Excel com abas `Priority`, `Economy`, `CP` e respectivas abas de zonas")
-                
-                # Campos de configuração
-                nome_cliente_fedex = st.text_input("Nome do Cliente (opcional):", key="nome_cliente_fedex", 
-                                                   placeholder="Ex: ClienteXYZ")
-                adicionar_margem_fedex = st.checkbox("Gerar arquivos com margem (Lap, Special, Partner, etc.)", 
+        col_logo_fedex, col_uploader_fedex = st.columns([1, 2])
+        with col_logo_fedex:
+            st.image("logo_fedex.png", width=150)
+        with col_uploader_fedex:
+            st.subheader("Processador de Modelo Excel")
+            
+            # Campo obrigatório para nome do cliente
+            nome_cliente_fedex = st.text_input("Nome do Cliente*:", key="nome_cliente_fedex", 
+                                               placeholder="Ex: ClienteXYZ")
+            
+            # Conversão de moeda
+            col_conversao, col_margem = st.columns(2)
+            with col_conversao:
+                taxa_conversao_fedex = st.number_input("Taxa de Conversão:", 
+                                                      min_value=0.01, 
+                                                      value=1.0, 
+                                                      step=0.01,
+                                                      format="%.2f",
+                                                      key="taxa_fedex",
+                                                      help="Ex: 1.17 para converter EUR → USD")
+            with col_margem:
+                adicionar_margem_fedex = st.checkbox("Gerar arquivos com margem", 
                                                      value=True, key="margem_fedex")
-                
-                arquivo_excel_usa = st.file_uploader("Escolha a planilha FedEx", type=["xlsx", "xls"], key="fedex_usa_excel")
-                
-                # --- BOTÃO E LÓGICA DE PROCESSAMENTO AQUI ---
-                if arquivo_excel_usa:
-                    if st.button("Processar FedEx", key="btn_fedex_usa"):
+            
+            arquivo_excel_fedex = st.file_uploader("Escolha a planilha FedEx", type=["xlsx", "xls"], key="fedex_excel")
+            
+            # --- BOTÃO E LÓGICA DE PROCESSAMENTO AQUI ---
+            if arquivo_excel_fedex:
+                if st.button("Processar FedEx", key="btn_fedex"):
+                    if not nome_cliente_fedex or nome_cliente_fedex.strip() == "":
+                        st.error("❌ Por favor, preencha o nome do cliente.")
+                    else:
                         with st.spinner("Aguarde... Processando a planilha FedEx..."):
                             try:
                                 arquivos_gerados = processar_arquivo_excel(
-                                    arquivo_excel_usa, 
+                                    arquivo_excel_fedex, 
                                     transportadora='FEDEX',
-                                    nome_cliente=nome_cliente_fedex,
-                                    adicionar_margem=adicionar_margem_fedex
+                                    nome_cliente=nome_cliente_fedex.strip(),
+                                    adicionar_margem=adicionar_margem_fedex,
+                                    taxa_conversao=taxa_conversao_fedex
                                 )
                                 if arquivos_gerados:
                                     zip_buffer = io.BytesIO()
@@ -120,22 +131,6 @@ elif escolha_topico == "Tabelas de Frete":
                                 with st.expander("Detalhes do erro"):
                                     st.code(traceback.format_exc())
 
-        with tab_fedex_br:
-            col_logo_br, col_uploader_br = st.columns([1, 2])
-            with col_logo_br:
-                st.image("logo_fedex.png", width=150)
-            with col_uploader_br:
-                st.subheader("Processador de Contrato PDF (Brasil)")
-                arquivo_fedex_br = st.file_uploader("Faça o upload do contrato FedEx Brasil", type=["pdf"], key="fedex_br_uploader")
-                
-                if arquivo_fedex_br:
-                    tipo_proc_br = st.radio("Tipo de Tabela:", ("Exportação", "Importação"), key="fedex_br_tipo", horizontal=True)
-                    
-                    # --- BOTÃO E LÓGICA DE PROCESSAMENTO AQUI ---
-                    if st.button("Processar FedEx Brasil", key="btn_fedex_br"):
-                        st.info(f"Processando PDF da FedEx Brasil como '{tipo_proc_br}'... Funcionalidade em desenvolvimento.")
-                        # Aqui entrará a chamada para a função do PDF, com o botão de download
-
     # --- MENU EXPANSÍVEL PARA A UPS ---
     with st.expander("📦 UPS"):
         col_logo_ups, col_uploader_ups = st.columns([1, 2])
@@ -143,47 +138,62 @@ elif escolha_topico == "Tabelas de Frete":
             st.image("logo_ups.png", width=150)
         with col_uploader_ups:
             st.subheader("Processador de Modelo Excel")
-            st.markdown("📋 **Formato esperado:** Excel com abas `Express`, `Standard` e respectivas abas de zonas")
             
-            # Campos de configuração
-            nome_cliente_ups = st.text_input("Nome do Cliente (opcional):", key="nome_cliente_ups", 
+            # Campo obrigatório para nome do cliente
+            nome_cliente_ups = st.text_input("Nome do Cliente*:", key="nome_cliente_ups", 
                                             placeholder="Ex: ClienteXYZ")
-            adicionar_margem_ups = st.checkbox("Gerar arquivos com margem (Lap, Special, Partner, etc.)", 
-                                              value=True, key="margem_ups")
+            
+            # Conversão de moeda
+            col_conversao, col_margem = st.columns(2)
+            with col_conversao:
+                taxa_conversao_ups = st.number_input("Taxa de Conversão:", 
+                                                    min_value=0.01, 
+                                                    value=1.0, 
+                                                    step=0.01,
+                                                    format="%.2f",
+                                                    key="taxa_ups",
+                                                    help="Ex: 1.17 para converter EUR → USD")
+            with col_margem:
+                adicionar_margem_ups = st.checkbox("Gerar arquivos com margem", 
+                                                  value=True, key="margem_ups")
             
             arquivo_excel_ups = st.file_uploader("Escolha a planilha UPS", type=["xlsx", "xls"], key="ups_excel")
             
             if arquivo_excel_ups:
                 if st.button("Processar UPS", key="btn_ups"):
-                    with st.spinner("Aguarde... Processando a planilha UPS..."):
-                        try:
-                            arquivos_gerados = processar_arquivo_excel(
-                                arquivo_excel_ups, 
-                                transportadora='UPS',
-                                nome_cliente=nome_cliente_ups,
-                                adicionar_margem=adicionar_margem_ups
-                            )
-                            if arquivos_gerados:
-                                zip_buffer = io.BytesIO()
-                                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zf:
-                                    for arquivo in arquivos_gerados:
-                                        zf.writestr(arquivo['nome'], arquivo['dados'])
-                                
-                                st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
-                                st.download_button(
-                                    label="📥 Baixar Todos os Arquivos (.zip)", 
-                                    data=zip_buffer.getvalue(),
-                                    file_name="resultados_UPS.zip", 
-                                    mime="application/zip",
-                                    use_container_width=True
+                    if not nome_cliente_ups or nome_cliente_ups.strip() == "":
+                        st.error("❌ Por favor, preencha o nome do cliente.")
+                    else:
+                        with st.spinner("Aguarde... Processando a planilha UPS..."):
+                            try:
+                                arquivos_gerados = processar_arquivo_excel(
+                                    arquivo_excel_ups, 
+                                    transportadora='UPS',
+                                    nome_cliente=nome_cliente_ups.strip(),
+                                    adicionar_margem=adicionar_margem_ups,
+                                    taxa_conversao=taxa_conversao_ups
                                 )
-                            else:
-                                st.warning("Nenhum arquivo foi gerado.")
-                        except Exception as e:
-                            st.error(f"❌ Ocorreu um erro: {e}")
-                            import traceback
-                            with st.expander("Detalhes do erro"):
-                                st.code(traceback.format_exc())
+                                if arquivos_gerados:
+                                    zip_buffer = io.BytesIO()
+                                    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zf:
+                                        for arquivo in arquivos_gerados:
+                                            zf.writestr(arquivo['nome'], arquivo['dados'])
+                                    
+                                    st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
+                                    st.download_button(
+                                        label="📥 Baixar Todos os Arquivos (.zip)", 
+                                        data=zip_buffer.getvalue(),
+                                        file_name="resultados_UPS.zip", 
+                                        mime="application/zip",
+                                        use_container_width=True
+                                    )
+                                else:
+                                    st.warning("Nenhum arquivo foi gerado.")
+                            except Exception as e:
+                                st.error(f"❌ Ocorreu um erro: {e}")
+                                import traceback
+                                with st.expander("Detalhes do erro"):
+                                    st.code(traceback.format_exc())
 
     # --- MENU EXPANSÍVEL PARA A DHL ---
     with st.expander("🚚 DHL"):
@@ -192,76 +202,114 @@ elif escolha_topico == "Tabelas de Frete":
             st.image("logo_dhl.png", width=150)
         with col_uploader_dhl:
             st.subheader("Processador de Modelo Excel")
-            st.markdown("📋 **Formato esperado:** Excel com aba `dhl` e aba de zonas `zonas dhl`")
             
-            # Campos de configuração
-            nome_cliente_dhl = st.text_input("Nome do Cliente (opcional):", key="nome_cliente_dhl", 
+            # Campo obrigatório para nome do cliente
+            nome_cliente_dhl = st.text_input("Nome do Cliente*:", key="nome_cliente_dhl", 
                                             placeholder="Ex: ClienteXYZ")
-            adicionar_margem_dhl = st.checkbox("Gerar arquivos com margem (Lap, Special, Partner, etc.)", 
-                                              value=True, key="margem_dhl")
+            
+            # Conversão de moeda
+            col_conversao, col_margem = st.columns(2)
+            with col_conversao:
+                taxa_conversao_dhl = st.number_input("Taxa de Conversão:", 
+                                                    min_value=0.01, 
+                                                    value=1.0, 
+                                                    step=0.01,
+                                                    format="%.2f",
+                                                    key="taxa_dhl",
+                                                    help="Ex: 1.17 para converter EUR → USD")
+            with col_margem:
+                adicionar_margem_dhl = st.checkbox("Gerar arquivos com margem", 
+                                                  value=True, key="margem_dhl")
             
             arquivo_excel_dhl = st.file_uploader("Escolha a planilha DHL", type=["xlsx", "xls"], key="dhl_excel")
             
             if arquivo_excel_dhl:
                 if st.button("Processar DHL", key="btn_dhl"):
-                    with st.spinner("Aguarde... Processando a planilha DHL..."):
-                        try:
-                            arquivos_gerados = processar_arquivo_excel(
-                                arquivo_excel_dhl, 
-                                transportadora='DHL',
-                                nome_cliente=nome_cliente_dhl,
-                                adicionar_margem=adicionar_margem_dhl
-                            )
-                            if arquivos_gerados:
-                                zip_buffer = io.BytesIO()
-                                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zf:
-                                    for arquivo in arquivos_gerados:
-                                        zf.writestr(arquivo['nome'], arquivo['dados'])
-                                
-                                st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
-                                st.download_button(
-                                    label="📥 Baixar Todos os Arquivos (.zip)", 
-                                    data=zip_buffer.getvalue(),
-                                    file_name="resultados_DHL.zip", 
-                                    mime="application/zip",
-                                    use_container_width=True
+                    if not nome_cliente_dhl or nome_cliente_dhl.strip() == "":
+                        st.error("❌ Por favor, preencha o nome do cliente.")
+                    else:
+                        with st.spinner("Aguarde... Processando a planilha DHL..."):
+                            try:
+                                arquivos_gerados = processar_arquivo_excel(
+                                    arquivo_excel_dhl, 
+                                    transportadora='DHL',
+                                    nome_cliente=nome_cliente_dhl.strip(),
+                                    adicionar_margem=adicionar_margem_dhl,
+                                    taxa_conversao=taxa_conversao_dhl
                                 )
-                            else:
-                                st.warning("Nenhum arquivo foi gerado.")
-                        except Exception as e:
-                            st.error(f"❌ Ocorreu um erro: {e}")
-                            import traceback
-                            with st.expander("Detalhes do erro"):
-                                st.code(traceback.format_exc())
+                                if arquivos_gerados:
+                                    zip_buffer = io.BytesIO()
+                                    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zf:
+                                        for arquivo in arquivos_gerados:
+                                            zf.writestr(arquivo['nome'], arquivo['dados'])
+                                    
+                                    st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
+                                    st.download_button(
+                                        label="📥 Baixar Todos os Arquivos (.zip)", 
+                                        data=zip_buffer.getvalue(),
+                                        file_name="resultados_DHL.zip", 
+                                        mime="application/zip",
+                                        use_container_width=True
+                                    )
+                                else:
+                                    st.warning("Nenhum arquivo foi gerado.")
+                            except Exception as e:
+                                st.error(f"❌ Ocorreu um erro: {e}")
+                                import traceback
+                                with st.expander("Detalhes do erro"):
+                                    st.code(traceback.format_exc())
     
     # --- MENU EXPANSÍVEL PARA OUTRAS TRANSPORTADORAS ---
     with st.expander("📮 Outras Transportadoras"):
         st.markdown("### Processador Genérico")
         st.info("⚠️ **Atenção:** Esta opção processa qualquer transportadora. Certifique-se de que o arquivo Excel segue o formato padrão.")
         
-        col_config, col_upload = st.columns([1, 2])
+        # Layout em duas colunas
+        col_left, col_right = st.columns(2)
         
-        with col_config:
-            st.markdown("**Configurações:**")
-            nome_cliente_outras = st.text_input("Nome do Cliente (opcional):", key="nome_cliente_outras", 
+        with col_left:
+            # Campo obrigatório para nome do cliente
+            nome_cliente_outras = st.text_input("Nome do Cliente*:", key="nome_cliente_outras", 
                                                placeholder="Ex: ClienteXYZ")
-            adicionar_margem_outras = st.checkbox("Gerar arquivos com margem (Lap, Special, Partner, etc.)", 
+            
+            # NOVO: Campo para nome da transportadora
+            nome_transportadora_outras = st.text_input("Nome da Transportadora*:", key="nome_transportadora_outras",
+                                                      placeholder="Ex: TNT, Aramex, etc.",
+                                                      help="Este nome aparecerá nos arquivos gerados")
+        
+        with col_right:
+            # Conversão de moeda
+            taxa_conversao_outras = st.number_input("Taxa de Conversão:", 
+                                                   min_value=0.01, 
+                                                   value=1.0, 
+                                                   step=0.01,
+                                                   format="%.2f",
+                                                   key="taxa_outras",
+                                                   help="Ex: 1.17 para converter EUR → USD")
+            
+            # Checkbox de margem
+            adicionar_margem_outras = st.checkbox("Gerar arquivos com margem", 
                                                  value=True, key="margem_outras")
         
-        with col_upload:
-            st.markdown("**Upload do Arquivo:**")
-            arquivo_excel_outras = st.file_uploader("Escolha a planilha da transportadora", 
-                                                   type=["xlsx", "xls"], key="outras_excel")
-            
-            if arquivo_excel_outras:
-                if st.button("Processar Transportadora", key="btn_outras"):
+        # Upload do arquivo
+        arquivo_excel_outras = st.file_uploader("Escolha a planilha da transportadora", 
+                                               type=["xlsx", "xls"], key="outras_excel")
+        
+        if arquivo_excel_outras:
+            if st.button("Processar Transportadora", key="btn_outras"):
+                if not nome_cliente_outras or nome_cliente_outras.strip() == "":
+                    st.error("❌ Por favor, preencha o nome do cliente.")
+                elif not nome_transportadora_outras or nome_transportadora_outras.strip() == "":
+                    st.error("❌ Por favor, preencha o nome da transportadora.")
+                else:
                     with st.spinner("Aguarde... Processando a planilha..."):
                         try:
                             arquivos_gerados = processar_arquivo_excel(
                                 arquivo_excel_outras, 
-                                transportadora='OUTRAS',
-                                nome_cliente=nome_cliente_outras,
-                                adicionar_margem=adicionar_margem_outras
+                                transportadora=nome_transportadora_outras.strip().upper(),
+                                nome_cliente=nome_cliente_outras.strip(),
+                                adicionar_margem=adicionar_margem_outras,
+                                taxa_conversao=taxa_conversao_outras
                             )
                             if arquivos_gerados:
                                 zip_buffer = io.BytesIO()

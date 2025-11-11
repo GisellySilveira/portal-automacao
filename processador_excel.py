@@ -5,6 +5,7 @@ import numpy as np
 import os
 import unidecode
 import io
+from banco_paises import processar_tabela_com_banco_paises
 
 # --- CONFIGURAÇÕES POR TRANSPORTADORA ---
 CONFIGURACOES_TRANSPORTADORAS = {
@@ -168,7 +169,7 @@ def aplicar_margens_e_criar_arquivos_em_memoria(df_base, nome_base_arquivo, adic
                                      float_format='%.10g', encoding='cp1252')
     arquivos_gerados.append({'nome': f"{nome_base_arquivo}_Base.csv", 'dados': csv_string})
     
-    # Aplica as margens
+    # Aplica as margens - NOMES SEM A PALAVRA "margem"
     plano = ['Lap', 'Special', 'Partner', 'Pro', 'Scaleup', 'Startup']
     margem = [1, 1.15, 1.2, 1.33, 1.4, 1.7, 1.9]
     colunas_margem = ['price', 'exceeding_price_300', 'exceeding_price_1000']
@@ -183,13 +184,14 @@ def aplicar_margens_e_criar_arquivos_em_memoria(df_base, nome_base_arquivo, adic
         
         csv_string = df_margem.to_csv(index=False, sep=';', decimal='.', 
                                      float_format='%.10g', encoding='cp1252')
+        # Nome sem "_margem" - apenas o plano direto
         arquivos_gerados.append({'nome': f"{nome_base_arquivo}_{nome_plano}.csv", 'dados': csv_string})
     
     return arquivos_gerados
 
 
 # --- FUNÇÃO PRINCIPAL DE PROCESSAMENTO ---
-def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome_cliente='', adicionar_margem=True):
+def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome_cliente='', adicionar_margem=True, taxa_conversao=1.0):
     """
     Processa arquivo Excel de tabelas de frete de acordo com a transportadora escolhida
     
@@ -198,6 +200,7 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
         transportadora: 'FEDEX', 'UPS', 'DHL', 'OUTRAS', etc.
         nome_cliente: Nome do cliente (opcional) para personalizar nome dos arquivos
         adicionar_margem: Se True, gera arquivos com diferentes margens. Se False, gera apenas arquivo base.
+        taxa_conversao: Taxa de conversão de moeda (ex: 1.17 para converter EUR para USD)
     
     Returns:
         Lista de dicionários com {'nome': nome_arquivo, 'dados': conteudo_csv}
@@ -205,11 +208,13 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
     
     print(f"\nIniciando processamento para {transportadora}...")
     
-    # Verifica se a transportadora está configurada
-    if transportadora.upper() not in CONFIGURACOES_TRANSPORTADORAS:
-        raise ValueError(f"Transportadora '{transportadora}' não está configurada. Transportadoras disponíveis: {list(CONFIGURACOES_TRANSPORTADORAS.keys())}")
-    
-    config = CONFIGURACOES_TRANSPORTADORAS[transportadora.upper()]
+    # Verifica se a transportadora está configurada, se não usa config genérica
+    if transportadora.upper() in CONFIGURACOES_TRANSPORTADORAS:
+        config = CONFIGURACOES_TRANSPORTADORAS[transportadora.upper()]
+    else:
+        # Transportadora não configurada - usa configuração genérica (como "OUTRAS")
+        print(f"   - Transportadora '{transportadora}' não pré-configurada. Usando detecção automática.")
+        config = CONFIGURACOES_TRANSPORTADORAS['OUTRAS'].copy()
     todos_os_arquivos_finais = []
     
     try:
@@ -224,8 +229,8 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
         
         print(f"Nome base do arquivo: {nome_base_excel}")
         
-        # Para "OUTRAS" transportadoras, detecta automaticamente as abas
-        if transportadora.upper() == 'OUTRAS':
+        # Para transportadoras não pré-configuradas, detecta automaticamente as abas
+        if transportadora.upper() not in ['FEDEX', 'UPS', 'DHL']:
             # Identifica abas de preço (todas exceto as que contêm "zona" no nome)
             abas_de_preco = [aba for aba in xls.sheet_names if 'zona' not in aba.lower() and 'zone' not in aba.lower()]
             print(f"Abas de preço detectadas automaticamente: {abas_de_preco}")
@@ -258,9 +263,19 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
                 print(f"Aviso: Aba de zonas '{aba_zona}' não encontrada. Pulando...")
                 continue
                 
-            df_zonas = pd.read_excel(xls, sheet_name=aba_zona, header=0)
-            df_zonas.columns = ['country', 'iso', 'Zona_Letra']
-            print(f"   - Zonas carregadas de: '{aba_zona}' ({len(df_zonas)} países)")
+            df_zonas_raw = pd.read_excel(xls, sheet_name=aba_zona, header=0)
+            
+            # Verifica se tem coluna ISO - se não tiver, usa banco de países
+            if len(df_zonas_raw.columns) >= 3:
+                # Formato completo: country, iso, zona
+                df_zonas = df_zonas_raw.copy()
+                df_zonas.columns = ['country', 'iso', 'Zona_Letra']
+                print(f"   - Zonas carregadas de: '{aba_zona}' ({len(df_zonas)} países)")
+            else:
+                # Formato simplificado: apenas country e zona - usa banco de países
+                print(f"   - Detectado formato simplificado (sem ISO). Usando banco de países...")
+                df_zonas = processar_tabela_com_banco_paises(df_zonas_raw)
+                print(f"   - Zonas processadas: {len(df_zonas)} países (ISO adicionado automaticamente)")
             
             # Lê a aba de preços
             df_raw = pd.read_excel(xls, sheet_name=nome_da_aba, header=None)
@@ -427,6 +442,12 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
                 errors='coerce'
             )
             df_precos.dropna(subset=['price'], inplace=True)
+            
+            # Aplica conversão de moeda se necessário
+            if taxa_conversao != 1.0:
+                print(f"   - Aplicando taxa de conversão: {taxa_conversao}")
+                df_precos['price'] = df_precos['price'] * taxa_conversao
+            
             df_precos['price'] = df_precos['price'].round(2)
             
             # Faz merge com as zonas
@@ -487,11 +508,10 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
             # Define nomes base para os arquivos seguindo o novo padrão
             # Formato: [nome_cliente_]doc_[transportadora]Table ou [nome_cliente_]notDoc_[transportadora]Table
             prefixo_cliente = f"{nome_cliente}_" if nome_cliente else ""
-            sufixo_margem = "_margem" if adicionar_margem else ""
             
             transportadora_lower = transportadora.lower()
-            caminho_base_doc = f"{prefixo_cliente}doc_{transportadora_lower}Table{sufixo_margem}"
-            caminho_base_not_doc = f"{prefixo_cliente}notDoc_{transportadora_lower}Table{sufixo_margem}"
+            caminho_base_doc = f"{prefixo_cliente}doc_{transportadora_lower}Table"
+            caminho_base_not_doc = f"{prefixo_cliente}notDoc_{transportadora_lower}Table"
             
             # Gera arquivos com ou sem margens
             if adicionar_margem:
