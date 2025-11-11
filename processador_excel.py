@@ -4,81 +4,472 @@ import pandas as pd
 import numpy as np
 import os
 import unidecode
+import io
 
-# --- FUNÇÃO DE SUPORTE MODIFICADA ---
+# --- CONFIGURAÇÕES POR TRANSPORTADORA ---
+CONFIGURACOES_TRANSPORTADORAS = {
+    'FEDEX': {
+        'abas_preco': ['Priority', 'Economy', 'CP'],
+        'mapa_abas_zonas': {
+            'Priority': 'zones priority ',
+            'Economy': 'zones economy',
+            'CP': 'zones cp'
+        },
+        'mapa_zonas_priority': {
+            'A': 1, 'B': 1, 'C': 2, 'D': 2, 'E': 3, 'F': 3, 'G': 3, 'H': 4,
+            'I': 4, 'R': 4, 'S': 4, 'T': 5, 'U': 5, 'V': 5, 'W': 5, 'X': 5, 'Y': 5
+        },
+        'mapa_zonas_economy_cp': {
+            'A': 1, 'B': 1, 'C': 2, 'D': 2, 'E': 3, 'F': 3, 'G': 3, 'H': 4,
+            'I': 4, 'R': 4, 'S': 4, 'V': 5, 'W': 5, 'X': 5
+        }
+    },
+    'DHL': {
+        'abas_preco': ['dhl'],
+        'mapa_abas_zonas': {
+            'dhl': 'zonas dhl'
+        },
+        'mapa_zonas_priority': {
+            'A': 1, 'B': 1, 'C': 2, 'D': 2, 'E': 3, 'F': 3, 'G': 3, 'H': 4,
+            'I': 4, 'R': 4, 'S': 4, 'T': 5, 'U': 5, 'V': 5, 'W': 5, 'X': 5, 'Y': 5
+        },
+        'mapa_zonas_economy_cp': {
+            'A': 1, 'B': 1, 'C': 2, 'D': 2, 'E': 3, 'F': 3, 'G': 3, 'H': 4,
+            'I': 4, 'R': 4, 'S': 4, 'V': 5, 'W': 5, 'X': 5
+        }
+    },
+    'UPS': {
+        'abas_preco': ['Express', 'Standard'],
+        'mapa_abas_zonas': {
+            'Express': 'zones express',
+            'Standard': 'zones standard'
+        },
+        'mapa_zonas_priority': {
+            'A': 1, 'B': 1, 'C': 2, 'D': 2, 'E': 3, 'F': 3, 'G': 3, 'H': 4,
+            'I': 4, 'R': 4, 'S': 4, 'T': 5, 'U': 5, 'V': 5, 'W': 5, 'X': 5, 'Y': 5
+        },
+        'mapa_zonas_economy_cp': {
+            'A': 1, 'B': 1, 'C': 2, 'D': 2, 'E': 3, 'F': 3, 'G': 3, 'H': 4,
+            'I': 4, 'R': 4, 'S': 4, 'V': 5, 'W': 5, 'X': 5
+        }
+    }
+}
+
+# Valores fixos (comuns a todas as transportadoras)
+VALORES_FIXOS = {
+    'exceeding_price_300': 0,
+    'exceeding_price_1000': 0,
+    'cubic_weight': 200,
+    'fuel_fee_percent': 10,
+    'overweight_handling': 331,
+    'exceeding_dimensions_handling': 331,
+    'remote_area_min': 88,
+    'remote_area_by_weight': 1.86,
+    'scheduled_delivery_9': 107.5,
+    'scheduled_delivery_10': 43,
+    'scheduled_delivery_12': 21,
+    'insurance_min': 39,
+    'insurance_value_percent': 1,
+    'doc_protection': 18,
+    'max_weight': 300,
+    'max_width': 120,
+    'max_height': 80,
+    'max_length': 80
+}
+
+
+# --- FUNÇÃO PARA APLICAR REGRAS INCREMENTAIS ---
+def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis, incremento_kg=1):
+    """
+    Aplica regras incrementais de peso adicional
+    """
+    if not regras_incrementais:
+        return df_base
+    
+    novas_linhas_geradas = []
+    
+    for (iso, country, zona_letra), group in df_base.groupby(['iso', 'country', 'Zona_Letra']):
+        if group.empty:
+            continue
+        
+        ultima_linha = group.sort_values('range_start', ascending=False).iloc[0]
+        ultimo_peso = ultima_linha['range_start']
+        ultimo_preco = ultima_linha['price']
+        
+        for regra in regras_incrementais:
+            peso_inicial = regra['peso_inicial']
+            peso_final = regra['peso_final']
+            valores_por_zona = regra['valores_zona']
+            
+            if str(zona_letra) not in valores_por_zona:
+                continue
+                
+            valor_incremental_por_kg = valores_por_zona[str(zona_letra)]
+            peso_gerado = peso_inicial
+            
+            while peso_gerado <= peso_final:
+                kgs_adicionados = peso_gerado - ultimo_peso
+                preco_calculado = ultimo_preco + (kgs_adicionados * valor_incremental_por_kg)
+                
+                linha_nova = ultima_linha.to_dict()
+                linha_nova['range_start'] = peso_gerado
+                linha_nova['range_end'] = peso_gerado
+                linha_nova['price'] = round(preco_calculado, 2)
+                novas_linhas_geradas.append(linha_nova)
+                
+                peso_gerado += incremento_kg
+    
+    if novas_linhas_geradas:
+        df_novas_linhas = pd.DataFrame(novas_linhas_geradas)
+        return pd.concat([df_base, df_novas_linhas], ignore_index=True)
+    return df_base
+
+
+# --- FUNÇÃO PARA APLICAR MARGENS E CRIAR ARQUIVOS EM MEMÓRIA ---
 def aplicar_margens_e_criar_arquivos_em_memoria(df_base, nome_base_arquivo):
     """
-    Esta função aplica as margens e retorna uma lista de arquivos (nome, dados) em memória.
-    Ela NÃO salva mais nada no disco.
+    Aplica diferentes margens e cria arquivos CSV em memória para cada plano
     """
-    if df_base.empty: return []
+    if df_base.empty:
+        return []
     
     arquivos_gerados = []
+    
+    # Primeiro salva a versão sem margem (base)
+    df_sem_margem = df_base.copy()
+    df_sem_margem['country'] = df_sem_margem['country'].apply(unidecode.unidecode)
+    csv_string = df_sem_margem.to_csv(index=False, sep=';', decimal='.', 
+                                     float_format='%.10g', encoding='cp1252')
+    arquivos_gerados.append({'nome': f"{nome_base_arquivo}_Base.csv", 'dados': csv_string})
+    
+    # Agora aplica as margens
     plano = ['Lap', 'Special', 'Partner', 'Pro', 'Scaleup', 'Startup']
     margem = [1, 1.15, 1.2, 1.33, 1.4, 1.7, 1.9]
     colunas_margem = ['price', 'exceeding_price_300', 'exceeding_price_1000']
-
+    
     for i, nome_plano in enumerate(plano):
         df_margem = df_base.copy()
         df_margem['country'] = df_margem['country'].apply(unidecode.unidecode)
+        
         for col in colunas_margem:
             if col in df_margem.columns:
-                 df_margem[col] = round((df_margem[col].astype(float) / margem[i]) * margem[i+1], 2)
+                df_margem[col] = round((df_margem[col].astype(float) / margem[i]) * margem[i+1], 2)
         
-        # Gera o CSV como uma string de texto em memória
-        csv_string = df_margem.to_csv(index=False, sep=';', decimal='.', float_format='%.10g', encoding='cp1252')
-        
-        nome_final_arquivo = f"{nome_base_arquivo}_{nome_plano}.csv"
-        # Adiciona o nome e o conteúdo do arquivo à nossa lista
-        arquivos_gerados.append({'nome': nome_final_arquivo, 'dados': csv_string})
-        
+        csv_string = df_margem.to_csv(index=False, sep=';', decimal='.', 
+                                     float_format='%.10g', encoding='cp1252')
+        arquivos_gerados.append({'nome': f"{nome_base_arquivo}_{nome_plano}.csv", 'dados': csv_string})
+    
     return arquivos_gerados
 
 
-# --- FUNÇÃO PRINCIPAL MODIFICADA ---
-def processar_arquivo_excel(arquivo_excel_recebido):
+# --- FUNÇÃO PRINCIPAL DE PROCESSAMENTO ---
+def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX'):
+    """
+    Processa arquivo Excel de tabelas de frete de acordo com a transportadora escolhida
     
-    # --- TODO O SEU CÓDIGO DE PROCESSAMENTO DO EXCEL VEM AQUI ---
-    # A lógica é a mesma, mas agora ele retorna uma lista de arquivos no final
-
-    LBS_TO_KG = 0.45359237
-    mapa_zonas_letra_para_numero = {'A': 1, 'B': 2, 'C': 3, 'D': 4, 'E': 5, 'F': 6, 'G': 7, 'H': 8, 'I': 8, 'J': 9, 'K': 9, 'L': 9, 'M': 9, 'N': 9, 'O': 9}
-    valores_fixos = {'exceeding_price_300': 0, 'exceeding_price_1000': 0, 'cubic_weight': 200, 'fuel_fee_percent': 10, 'overweight_handling': 331, 'exceeding_dimensions_handling': 331, 'remote_area_min': 88, 'remote_area_by_weight': 1.86, 'scheduled_delivery_9': 107.5, 'scheduled_delivery_10': 43, 'scheduled_delivery_12': 21, 'insurance_min': 39, 'insurance_value_percent': 1, 'doc_protection': 18, 'max_weight': 300, 'max_width': 120, 'max_height': 80, 'max_length': 80}
-
-    xls = pd.ExcelFile(arquivo_excel_recebido)
-    df_zonas = pd.read_excel(xls, sheet_name='Zonas', header=0)
-    df_zonas_mapeada = df_zonas[['Country/Territory', 'IATA', 'IPE']].copy()
-    df_zonas_mapeada.rename(columns={'Country/Territory': 'country', 'IATA': 'iso', 'IPE': 'Zona_Letra'}, inplace=True)
+    Args:
+        arquivo_excel_recebido: Arquivo Excel (pode ser path ou file object)
+        transportadora: 'FEDEX', 'UPS', 'DHL', etc.
     
-    abas_de_preco = [aba for aba in xls.sheet_names if aba != 'Zonas']
+    Returns:
+        Lista de dicionários com {'nome': nome_arquivo, 'dados': conteudo_csv}
+    """
     
+    print(f"\nIniciando processamento para {transportadora}...")
+    
+    # Verifica se a transportadora está configurada
+    if transportadora.upper() not in CONFIGURACOES_TRANSPORTADORAS:
+        raise ValueError(f"Transportadora '{transportadora}' não está configurada. Transportadoras disponíveis: {list(CONFIGURACOES_TRANSPORTADORAS.keys())}")
+    
+    config = CONFIGURACOES_TRANSPORTADORAS[transportadora.upper()]
     todos_os_arquivos_finais = []
-
-    for nome_da_aba in abas_de_preco:
-        print(f"\n--- Processando a aba: '{nome_da_aba}' ---")
-        df_raw = pd.read_excel(xls, sheet_name=nome_da_aba, header=None)
-        
-        # ... (Toda a sua lógica de extração e processamento da aba continua aqui) ...
-        # ... (Eu omiti por brevidade, mas ela deve estar aqui) ...
-        
-        # Exemplo simplificado da lógica de processamento
-        df_precos = pd.read_excel(xls, sheet_name=nome_da_aba, header=2) # Simplificação
-        df_precos.columns = df_precos.columns.str.strip()
-        tabela_doc_final = df_precos.head(10).copy() # Apenas para exemplo
-        tabela_doc_final['country'] = "Exemplo" # Adiciona a coluna para a função de margem funcionar
-        tabela_not_doc_final = df_precos.tail(10).copy() # Apenas para exemplo
-        tabela_not_doc_final['country'] = "Exemplo" # Adiciona a coluna para a função de margem funcionar
-        
-        # --- PARTE FINAL MODIFICADA ---
-        nome_base_arquivo = nome_da_aba.replace(' ', '_')
-        caminho_base_doc = f"{nome_base_arquivo}_doc"
-        caminho_base_not_doc = f"{nome_base_arquivo}_notDoc"
-
-        lista_arquivos_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_doc_final, caminho_base_doc)
-        lista_arquivos_not_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_not_doc_final, caminho_base_not_doc)
-        
-        todos_os_arquivos_finais.extend(lista_arquivos_doc)
-        todos_os_arquivos_finais.extend(lista_arquivos_not_doc)
     
-    # A função principal agora retorna a lista com todos os arquivos
-    return todos_os_arquivos_finais
+    try:
+        xls = pd.ExcelFile(arquivo_excel_recebido)
+        print(f"Abas encontradas no arquivo: {xls.sheet_names}")
+        
+        # Extrai o nome base do arquivo Excel
+        if hasattr(arquivo_excel_recebido, 'name'):
+            nome_base_excel = os.path.splitext(arquivo_excel_recebido.name)[0]
+        else:
+            nome_base_excel = os.path.splitext(os.path.basename(str(arquivo_excel_recebido)))[0]
+        
+        print(f"Nome base do arquivo: {nome_base_excel}")
+        
+        # Processa cada aba de preços
+        abas_de_preco = config['abas_preco']
+        
+        for nome_da_aba in abas_de_preco:
+            # Verifica se a aba existe no arquivo
+            if nome_da_aba not in xls.sheet_names:
+                print(f"Aviso: Aba '{nome_da_aba}' não encontrada no arquivo. Pulando...")
+                continue
+                
+            print(f"\n--- Processando a aba: '{nome_da_aba}' ---")
+            
+            # Lê a aba de zonas correspondente
+            aba_zona = config['mapa_abas_zonas'][nome_da_aba]
+            
+            if aba_zona not in xls.sheet_names:
+                print(f"Aviso: Aba de zonas '{aba_zona}' não encontrada. Pulando...")
+                continue
+                
+            df_zonas = pd.read_excel(xls, sheet_name=aba_zona, header=0)
+            df_zonas.columns = ['country', 'iso', 'Zona_Letra']
+            print(f"   - Zonas carregadas de: '{aba_zona}' ({len(df_zonas)} países)")
+            
+            # Lê a aba de preços
+            df_raw = pd.read_excel(xls, sheet_name=nome_da_aba, header=None)
+            
+            # A linha 1 contém as zonas (A, B, C, ...)
+            zonas_disponiveis_raw = df_raw.iloc[1, 1:].dropna().tolist()
+            zonas_disponiveis = [z for z in zonas_disponiveis_raw if z != 'Kgs']
+            print(f"   - Zonas de preço encontradas: {zonas_disponiveis}")
+            
+            # Processa cada seção (Envelope, Pak, Package)
+            todas_linhas = []
+            regras_incrementais = []
+            
+            # Identifica as linhas de cada tipo
+            idx = 2
+            while idx < len(df_raw):
+                row = df_raw.iloc[idx]
+                tipo_servico = row[0] if pd.notna(row[0]) else row[1]
+                
+                # Se encontrar uma nova tabela de regras incrementais
+                if tipo_servico == 'Weight' and idx > 2:
+                    print(f"   - Encontradas regras incrementais na linha {idx}")
+                    if idx + 1 < len(df_raw):
+                        linha_kgs = df_raw.iloc[idx + 1]
+                        
+                        if linha_kgs[0] == 'Kgs':
+                            zonas_regras = linha_kgs[1:].dropna().tolist()
+                            col_offset = 1
+                        elif linha_kgs[1] == 'Kgs':
+                            zonas_regras = linha_kgs[2:].dropna().tolist()
+                            col_offset = 2
+                        else:
+                            idx += 1
+                            continue
+                        
+                        j = idx + 2
+                        while j < len(df_raw):
+                            linha_regra = df_raw.iloc[j]
+                            peso_info = linha_regra[0]
+                            
+                            if pd.isna(peso_info):
+                                break
+                            
+                            try:
+                                if isinstance(peso_info, str):
+                                    if '-' in peso_info:
+                                        partes = peso_info.split('-')
+                                        peso_inicial = float(partes[0].strip().replace(',', '.'))
+                                        peso_final = float(partes[1].strip().replace(',', '.'))
+                                        valores_zona = {}
+                                        
+                                        for i, zona in enumerate(zonas_regras):
+                                            valor = linha_regra[i + 1]
+                                            if pd.notna(valor):
+                                                valor_str = str(valor).replace(',', '.')
+                                                valores_zona[str(zona)] = float(valor_str)
+                                        
+                                        regras_incrementais.append({
+                                            'peso_inicial': peso_inicial,
+                                            'peso_final': peso_final,
+                                            'valores_zona': valores_zona
+                                        })
+                                    else:
+                                        peso_inicial = float(peso_info.replace(',', '.'))
+                                        peso_final = float(str(linha_regra[1]).replace(',', '.'))
+                                        valores_zona = {}
+                                        
+                                        for i, zona in enumerate(zonas_regras):
+                                            valor = linha_regra[i + col_offset]
+                                            if pd.notna(valor):
+                                                valor_str = str(valor).replace(',', '.')
+                                                valores_zona[str(zona)] = float(valor_str)
+                                        
+                                        regras_incrementais.append({
+                                            'peso_inicial': peso_inicial,
+                                            'peso_final': peso_final,
+                                            'valores_zona': valores_zona
+                                        })
+                                else:
+                                    peso_inicial = float(peso_info)
+                                    peso_final = float(linha_regra[1])
+                                    valores_zona = {}
+                                    
+                                    for i, zona in enumerate(zonas_regras):
+                                        valor = linha_regra[i + col_offset]
+                                        if pd.notna(valor):
+                                            valor_str = str(valor).replace(',', '.')
+                                            valores_zona[str(zona)] = float(valor_str)
+                                    
+                                    regras_incrementais.append({
+                                        'peso_inicial': peso_inicial,
+                                        'peso_final': peso_final,
+                                        'valores_zona': valores_zona
+                                    })
+                            except Exception as e:
+                                print(f"     Erro ao processar regra na linha {j}: {e}")
+                                break
+                            j += 1
+                        break
+                    idx += 1
+                    continue
+                
+                # Envelope: só tem uma linha de preço
+                if tipo_servico == 'Envelope':
+                    peso = 0.5
+                    for i, zona_letra in enumerate(zonas_disponiveis):
+                        col_idx = i + 2 if 'Kgs' in zonas_disponiveis_raw else i + 1
+                        preco = df_raw.iloc[idx + 1, col_idx]
+                        if pd.notna(preco):
+                            todas_linhas.append({
+                                'Tipo': 'Envelope',
+                                'range_end': peso,
+                                'range_start': peso,
+                                'Zona_Letra': zona_letra,
+                                'price': preco
+                            })
+                    idx += 2
+                    continue
+                
+                # Pak e Package: múltiplas linhas de peso
+                elif tipo_servico in ['Pak', 'Package']:
+                    j = idx + 1
+                    while j < len(df_raw):
+                        peso_col0 = df_raw.iloc[j, 0]
+                        peso_col1 = df_raw.iloc[j, 1]
+                        peso = peso_col0 if pd.notna(peso_col0) else peso_col1
+                        
+                        if pd.isna(peso) or peso in ['Envelope', 'Pak', 'Package', 'Weight']:
+                            break
+                        
+                        try:
+                            peso = float(peso)
+                            for i, zona_letra in enumerate(zonas_disponiveis):
+                                col_idx = i + 2 if 'Kgs' in zonas_disponiveis_raw else i + 1
+                                preco = df_raw.iloc[j, col_idx]
+                                if pd.notna(preco):
+                                    todas_linhas.append({
+                                        'Tipo': tipo_servico,
+                                        'range_end': peso,
+                                        'range_start': peso,
+                                        'Zona_Letra': zona_letra,
+                                        'price': preco
+                                    })
+                        except:
+                            pass
+                        j += 1
+                    idx = j
+                    continue
+                
+                idx += 1
+            
+            print(f"   - Total de regras incrementais encontradas: {len(regras_incrementais)}")
+            
+            # Cria DataFrame com todos os dados
+            df_precos = pd.DataFrame(todas_linhas)
+            
+            if df_precos.empty:
+                print(f"   Nenhum dado encontrado nesta aba. Pulando...")
+                continue
+            
+            # Limpa e converte preços
+            df_precos['price'] = pd.to_numeric(
+                df_precos['price'].astype(str).str.replace(',', '.'), 
+                errors='coerce'
+            )
+            df_precos.dropna(subset=['price'], inplace=True)
+            df_precos['price'] = df_precos['price'].round(2)
+            
+            # Faz merge com as zonas
+            df_final = pd.merge(df_precos, df_zonas, on='Zona_Letra', how='left')
+            
+            # Aplica o mapeamento de zona apropriado (1-5)
+            if nome_da_aba == 'Priority' or nome_da_aba == 'Express':
+                df_final['zone'] = df_final['Zona_Letra'].map(config['mapa_zonas_priority'])
+            else:
+                df_final['zone'] = df_final['Zona_Letra'].map(config['mapa_zonas_economy_cp'])
+            
+            df_final['zone'] = df_final['zone'].fillna(5).astype(int)
+            
+            # Adiciona valores fixos
+            for col_name, value in VALORES_FIXOS.items():
+                df_final[col_name] = value
+            
+            # Organiza as colunas
+            ordem_colunas = ['iso', 'country', 'zone', 'range_end', 'price'] + list(VALORES_FIXOS.keys())
+            df_final = df_final.reindex(columns=ordem_colunas + ['Tipo', 'range_start', 'Zona_Letra'])
+            
+            # Remove linhas sem país/iso
+            df_final.dropna(subset=['iso', 'country'], inplace=True)
+            
+            print(f"   - Total de registros processados: {len(df_final)}")
+            
+            # Separa documentos e não-documentos
+            if nome_da_aba == 'Priority':
+                tabela_doc_final = df_final[df_final['Tipo'] == 'Pak'].copy()
+            else:
+                tabela_doc_final = df_final[df_final['Tipo'].isin(['Envelope', 'Pak'])].copy()
+            
+            tabela_not_doc_final_pre = df_final[df_final['Tipo'] == 'Package'].copy()
+            
+            # Aplica regras incrementais
+            if regras_incrementais:
+                if nome_da_aba == 'dhl':
+                    print("   - Aplicando regras incrementais (a cada 0.5 kg)...")
+                    tabela_not_doc_final = aplicar_regras_incrementais(
+                        tabela_not_doc_final_pre, regras_incrementais, zonas_disponiveis, incremento_kg=0.5
+                    )
+                else:
+                    print("   - Aplicando regras incrementais (a cada 1 kg)...")
+                    tabela_not_doc_final = aplicar_regras_incrementais(
+                        tabela_not_doc_final_pre, regras_incrementais, zonas_disponiveis, incremento_kg=1
+                    )
+            else:
+                tabela_not_doc_final = tabela_not_doc_final_pre
+            
+            # Ordena os dados
+            tabela_doc_final.sort_values(by=['country', 'range_end'], inplace=True)
+            tabela_not_doc_final.sort_values(by=['country', 'range_end'], inplace=True)
+            
+            # Remove colunas auxiliares
+            tabela_doc_final.drop(columns=['Tipo', 'range_start', 'Zona_Letra'], inplace=True, errors='ignore')
+            tabela_not_doc_final.drop(columns=['Tipo', 'range_start', 'Zona_Letra'], inplace=True, errors='ignore')
+            
+            # Define nomes base para os arquivos
+            nome_base_arquivo = nome_da_aba.replace(' ', '_')
+            caminho_base_doc = f"{transportadora}_{nome_base_excel}_{nome_base_arquivo}_docTable"
+            caminho_base_not_doc = f"{transportadora}_{nome_base_excel}_{nome_base_arquivo}_notDocTable"
+            
+            # Gera arquivos com margens
+            print("   - Aplicando margens e criando arquivos 'docTable'...")
+            arquivos_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_doc_final, caminho_base_doc)
+            todos_os_arquivos_finais.extend(arquivos_doc)
+            
+            print("   - Aplicando margens e criando arquivos 'notDocTable'...")
+            arquivos_not_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_not_doc_final, caminho_base_not_doc)
+            todos_os_arquivos_finais.extend(arquivos_not_doc)
+            
+            print(f"\n   [OK] Aba '{nome_da_aba}' processada com sucesso!")
+            print(f"   - Documentos: {len(tabela_doc_final)} registros")
+            print(f"   - Não-Documentos: {len(tabela_not_doc_final)} registros")
+        
+        print("\n" + "="*60)
+        print(f"[OK] PROCESSAMENTO DE {transportadora} CONCLUÍDO COM SUCESSO!")
+        print(f"Total de arquivos gerados: {len(todos_os_arquivos_finais)}")
+        print("="*60)
+        
+        return todos_os_arquivos_finais
+    
+    except FileNotFoundError:
+        print(f"ERRO: O arquivo não foi encontrado")
+        raise
+    except Exception as e:
+        import traceback
+        print(f"\nOcorreu um erro inesperado: {e}")
+        traceback.print_exc()
+        raise
