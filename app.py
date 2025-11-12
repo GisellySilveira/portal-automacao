@@ -46,7 +46,7 @@ if escolha_topico == "Página Inicial":
 elif escolha_topico == "Tabelas de Frete":
     st.header("Ferramentas de Processamento de Tabelas de Frete")
     st.write("Selecione uma das opções abaixo para iniciar o processamento.")
-    
+
     # Botão para baixar modelo Excel
     st.markdown("---")
     col_info, col_download = st.columns([2, 1])
@@ -78,23 +78,25 @@ elif escolha_topico == "Tabelas de Frete":
             nome_cliente_fedex = st.text_input("Nome do Cliente*:", key="nome_cliente_fedex", 
                                                placeholder="Ex: ClienteXYZ")
             
-            # Conversão de moeda
+            # Conversão de moeda e margem
             col_conversao, col_margem = st.columns(2)
             with col_conversao:
+                usar_conversao_fedex = st.checkbox("Usar conversão de moeda", value=False, key="usar_conv_fedex")
                 taxa_conversao_fedex = st.number_input("Taxa de Conversão:", 
                                                       min_value=0.01, 
                                                       value=1.0, 
                                                       step=0.01,
                                                       format="%.2f",
                                                       key="taxa_fedex",
-                                                      help="Ex: 1.17 para converter EUR → USD")
+                                                      help="Ex: 1.17 para converter EUR → USD",
+                                                      disabled=not usar_conversao_fedex)
             with col_margem:
                 adicionar_margem_fedex = st.checkbox("Gerar arquivos com margem", 
                                                      value=True, key="margem_fedex")
             
             arquivo_excel_fedex = st.file_uploader("Escolha a planilha FedEx", type=["xlsx", "xls"], key="fedex_excel")
-            
-            # --- BOTÃO E LÓGICA DE PROCESSAMENTO AQUI ---
+                
+                # --- BOTÃO E LÓGICA DE PROCESSAMENTO AQUI ---
             if arquivo_excel_fedex:
                 if st.button("Processar FedEx", key="btn_fedex"):
                     if not nome_cliente_fedex or nome_cliente_fedex.strip() == "":
@@ -107,7 +109,7 @@ elif escolha_topico == "Tabelas de Frete":
                                     transportadora='FEDEX',
                                     nome_cliente=nome_cliente_fedex.strip(),
                                     adicionar_margem=adicionar_margem_fedex,
-                                    taxa_conversao=taxa_conversao_fedex
+                                    taxa_conversao=taxa_conversao_fedex if usar_conversao_fedex else 1.0
                                 )
                                 if arquivos_gerados:
                                     zip_buffer = io.BytesIO()
@@ -143,16 +145,18 @@ elif escolha_topico == "Tabelas de Frete":
             nome_cliente_ups = st.text_input("Nome do Cliente*:", key="nome_cliente_ups", 
                                             placeholder="Ex: ClienteXYZ")
             
-            # Conversão de moeda
+            # Conversão de moeda e margem
             col_conversao, col_margem = st.columns(2)
             with col_conversao:
+                usar_conversao_ups = st.checkbox("Usar conversão de moeda", value=False, key="usar_conv_ups")
                 taxa_conversao_ups = st.number_input("Taxa de Conversão:", 
                                                     min_value=0.01, 
                                                     value=1.0, 
                                                     step=0.01,
                                                     format="%.2f",
                                                     key="taxa_ups",
-                                                    help="Ex: 1.17 para converter EUR → USD")
+                                                    help="Ex: 1.17 para converter EUR → USD",
+                                                    disabled=not usar_conversao_ups)
             with col_margem:
                 adicionar_margem_ups = st.checkbox("Gerar arquivos com margem", 
                                                   value=True, key="margem_ups")
@@ -171,7 +175,7 @@ elif escolha_topico == "Tabelas de Frete":
                                     transportadora='UPS',
                                     nome_cliente=nome_cliente_ups.strip(),
                                     adicionar_margem=adicionar_margem_ups,
-                                    taxa_conversao=taxa_conversao_ups
+                                    taxa_conversao=taxa_conversao_ups if usar_conversao_ups else 1.0
                                 )
                                 if arquivos_gerados:
                                     zip_buffer = io.BytesIO()
@@ -207,16 +211,18 @@ elif escolha_topico == "Tabelas de Frete":
             nome_cliente_dhl = st.text_input("Nome do Cliente*:", key="nome_cliente_dhl", 
                                             placeholder="Ex: ClienteXYZ")
             
-            # Conversão de moeda
+            # Conversão de moeda e margem
             col_conversao, col_margem = st.columns(2)
             with col_conversao:
+                usar_conversao_dhl = st.checkbox("Usar conversão de moeda", value=False, key="usar_conv_dhl")
                 taxa_conversao_dhl = st.number_input("Taxa de Conversão:", 
                                                     min_value=0.01, 
                                                     value=1.0, 
                                                     step=0.01,
                                                     format="%.2f",
                                                     key="taxa_dhl",
-                                                    help="Ex: 1.17 para converter EUR → USD")
+                                                    help="Ex: 1.17 para converter EUR → USD",
+                                                    disabled=not usar_conversao_dhl)
             with col_margem:
                 adicionar_margem_dhl = st.checkbox("Gerar arquivos com margem", 
                                                   value=True, key="margem_dhl")
@@ -235,7 +241,7 @@ elif escolha_topico == "Tabelas de Frete":
                                     transportadora='DHL',
                                     nome_cliente=nome_cliente_dhl.strip(),
                                     adicionar_margem=adicionar_margem_dhl,
-                                    taxa_conversao=taxa_conversao_dhl
+                                    taxa_conversao=taxa_conversao_dhl if usar_conversao_dhl else 1.0
                                 )
                                 if arquivos_gerados:
                                     zip_buffer = io.BytesIO()
@@ -279,13 +285,15 @@ elif escolha_topico == "Tabelas de Frete":
         
         with col_right:
             # Conversão de moeda
+            usar_conversao_outras = st.checkbox("Usar conversão de moeda", value=False, key="usar_conv_outras")
             taxa_conversao_outras = st.number_input("Taxa de Conversão:", 
                                                    min_value=0.01, 
                                                    value=1.0, 
                                                    step=0.01,
                                                    format="%.2f",
                                                    key="taxa_outras",
-                                                   help="Ex: 1.17 para converter EUR → USD")
+                                                   help="Ex: 1.17 para converter EUR → USD",
+                                                   disabled=not usar_conversao_outras)
             
             # Checkbox de margem
             adicionar_margem_outras = st.checkbox("Gerar arquivos com margem", 
@@ -309,7 +317,7 @@ elif escolha_topico == "Tabelas de Frete":
                                 transportadora=nome_transportadora_outras.strip().upper(),
                                 nome_cliente=nome_cliente_outras.strip(),
                                 adicionar_margem=adicionar_margem_outras,
-                                taxa_conversao=taxa_conversao_outras
+                                taxa_conversao=taxa_conversao_outras if usar_conversao_outras else 1.0
                             )
                             if arquivos_gerados:
                                 zip_buffer = io.BytesIO()

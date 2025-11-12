@@ -506,12 +506,13 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
             tabela_not_doc_final.drop(columns=['Tipo', 'range_start', 'Zona_Letra'], inplace=True, errors='ignore')
             
             # Define nomes base para os arquivos seguindo o novo padrão
-            # Formato: [nome_cliente_]doc_[transportadora]Table ou [nome_cliente_]notDoc_[transportadora]Table
+            # Formato: [nome_cliente_]doc_[transportadora]Table_[NomeAba] ou [nome_cliente_]notDoc_[transportadora]Table_[NomeAba]
             prefixo_cliente = f"{nome_cliente}_" if nome_cliente else ""
             
             transportadora_lower = transportadora.lower()
-            caminho_base_doc = f"{prefixo_cliente}doc_{transportadora_lower}Table"
-            caminho_base_not_doc = f"{prefixo_cliente}notDoc_{transportadora_lower}Table"
+            nome_aba_limpo = nome_da_aba.replace(' ', '_')
+            caminho_base_doc = f"{prefixo_cliente}doc_{transportadora_lower}Table_{nome_aba_limpo}"
+            caminho_base_not_doc = f"{prefixo_cliente}notDoc_{transportadora_lower}Table_{nome_aba_limpo}"
             
             # Gera arquivos com ou sem margens
             if adicionar_margem:
