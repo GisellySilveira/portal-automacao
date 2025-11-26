@@ -91,11 +91,28 @@ VALORES_FIXOS = {
 }
 
 
+# --- FUNÇÃO PARA ARREDONDAR PESO COMERCIAL ---
+def arredondar_peso_comercial(peso):
+    """
+    Arredonda peso para cima ao meio kg mais próximo (0.5, 1.0, 1.5, 2.0, etc.)
+    
+    Exemplos:
+    0.6 → 1.0
+    0.7 → 1.0
+    1.1 → 1.5
+    1.2 → 1.5
+    1.6 → 2.0
+    """
+    import math
+    # Arredonda para cima ao 0.5 mais próximo
+    return math.ceil(peso * 2) / 2
+
+
 # --- FUNÇÃO PARA APLICAR REGRAS INCREMENTAIS ---
 def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis, incremento_kg=1):
     """
-    Aplica regras incrementais de peso adicional com suporte a incrementos decimais,
-    como 0.1 (0.5, 0.6, 0.7...).
+    Aplica regras incrementais gerando pesos de 0.1 em 0.1 kg (100g em 100g)
+    e calculando preço baseado no peso comercial arredondado para cima.
     """
     if not regras_incrementais:
         return df_base
@@ -106,9 +123,12 @@ def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis,
         if group.empty:
             continue
         
-        ultima_linha = group.sort_values('range_start', ascending=False).iloc[0]
-        ultimo_peso = float(ultima_linha['range_start'])
-        ultimo_preco = float(ultima_linha['price'])
+        # Cria um dicionário de preços por peso da tabela base para consulta rápida
+        precos_base = {}
+        for _, row in group.iterrows():
+            peso_base = round(float(row['range_start']), 1)
+            preco_base = float(row['price'])
+            precos_base[peso_base] = preco_base
         
         for regra in regras_incrementais:
             peso_inicial = float(regra['peso_inicial'])
@@ -118,23 +138,42 @@ def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis,
             if str(zona_letra) not in valores_por_zona:
                 continue
             
-            valor_incremental_por_kg = valores_por_zona[str(zona_letra)]
             peso_gerado = peso_inicial
             
-            # 🔥 Permite incrementos como 0.1 sem acumular erro de float
-            while round(peso_gerado, 3) <= peso_final:
+            # 🔥 Gera pesos de 0.1 em 0.1 (100g em 100g)
+            while round(peso_gerado, 1) <= peso_final:
+                # Calcula o peso comercial (arredondado para cima ao 0.5 mais próximo)
+                peso_comercial = arredondar_peso_comercial(peso_gerado)
                 
-                kgs_adicionados = peso_gerado - ultimo_peso
-                preco_calculado = ultimo_preco + (kgs_adicionados * valor_incremental_por_kg)
+                # Busca o preço do peso comercial na tabela base
+                if peso_comercial in precos_base:
+                    preco_calculado = precos_base[peso_comercial]
+                else:
+                    # Se não encontrar o peso exato, busca o mais próximo maior
+                    pesos_disponiveis = sorted(precos_base.keys())
+                    peso_comercial_ajustado = None
+                    for p in pesos_disponiveis:
+                        if p >= peso_comercial:
+                            peso_comercial_ajustado = p
+                            break
+                    
+                    if peso_comercial_ajustado:
+                        preco_calculado = precos_base[peso_comercial_ajustado]
+                    else:
+                        # Se não encontrar, pula este peso
+                        peso_gerado = round(peso_gerado + 0.1, 1)
+                        continue
                 
-                linha_nova = ultima_linha.to_dict()
-                linha_nova['range_start'] = round(peso_gerado, 3)
-                linha_nova['range_end'] = round(peso_gerado, 3)
+                # Pega a última linha como modelo para copiar outros campos
+                ultima_linha = group.iloc[0].to_dict()
+                linha_nova = ultima_linha.copy()
+                linha_nova['range_start'] = round(peso_gerado, 1)
+                linha_nova['range_end'] = round(peso_gerado, 1)
                 linha_nova['price'] = round(preco_calculado, 2)
                 
                 novas_linhas_geradas.append(linha_nova)
                 
-                peso_gerado = round(peso_gerado + incremento_kg, 3)
+                peso_gerado = round(peso_gerado + 0.1, 1)
     
     if novas_linhas_geradas:
         df_novas_linhas = pd.DataFrame(novas_linhas_geradas)
@@ -488,18 +527,13 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
             
             tabela_not_doc_final_pre = df_final[df_final['Tipo'] == 'Package'].copy()
             
-            # Aplica regras incrementais
+            # Aplica regras incrementais (sempre de 100 em 100 gramas = 0.1 kg)
             if regras_incrementais:
-                if nome_da_aba == 'dhl':
-                    print("   - Aplicando regras incrementais (a cada 0.5 kg)...")
-                    tabela_not_doc_final = aplicar_regras_incrementais(
-                        tabela_not_doc_final_pre, regras_incrementais, zonas_disponiveis, incremento_kg=0.5
-                    )
-                else:
-                    print("   - Aplicando regras incrementais (a cada 1 kg)...")
-                    tabela_not_doc_final = aplicar_regras_incrementais(
-                        tabela_not_doc_final_pre, regras_incrementais, zonas_disponiveis, incremento_kg=0.1
-                    )
+                print("   - Aplicando regras incrementais (a cada 100g = 0.1 kg)...")
+                print("   - Preços baseados no peso comercial arredondado para cima (0.5, 1.0, 1.5, 2.0...)")
+                tabela_not_doc_final = aplicar_regras_incrementais(
+                    tabela_not_doc_final_pre, regras_incrementais, zonas_disponiveis
+                )
             else:
                 tabela_not_doc_final = tabela_not_doc_final_pre
             

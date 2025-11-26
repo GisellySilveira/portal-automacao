@@ -115,3 +115,4 @@ if __name__ == "__main__":
     print("\nOu use a interface web: streamlit run app.py")
     print("="*60 + "\n")
 
+
