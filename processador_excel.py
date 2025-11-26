@@ -94,7 +94,8 @@ VALORES_FIXOS = {
 # --- FUNÇÃO PARA APLICAR REGRAS INCREMENTAIS ---
 def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis, incremento_kg=1):
     """
-    Aplica regras incrementais de peso adicional
+    Aplica regras incrementais de peso adicional com suporte a incrementos decimais,
+    como 0.1 (0.5, 0.6, 0.7...).
     """
     if not regras_incrementais:
         return df_base
@@ -106,36 +107,41 @@ def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis,
             continue
         
         ultima_linha = group.sort_values('range_start', ascending=False).iloc[0]
-        ultimo_peso = ultima_linha['range_start']
-        ultimo_preco = ultima_linha['price']
+        ultimo_peso = float(ultima_linha['range_start'])
+        ultimo_preco = float(ultima_linha['price'])
         
         for regra in regras_incrementais:
-            peso_inicial = regra['peso_inicial']
-            peso_final = regra['peso_final']
+            peso_inicial = float(regra['peso_inicial'])
+            peso_final = float(regra['peso_final'])
             valores_por_zona = regra['valores_zona']
             
             if str(zona_letra) not in valores_por_zona:
                 continue
-                
+            
             valor_incremental_por_kg = valores_por_zona[str(zona_letra)]
             peso_gerado = peso_inicial
             
-            while peso_gerado <= peso_final:
+            # 🔥 Permite incrementos como 0.1 sem acumular erro de float
+            while round(peso_gerado, 3) <= peso_final:
+                
                 kgs_adicionados = peso_gerado - ultimo_peso
                 preco_calculado = ultimo_preco + (kgs_adicionados * valor_incremental_por_kg)
                 
                 linha_nova = ultima_linha.to_dict()
-                linha_nova['range_start'] = peso_gerado
-                linha_nova['range_end'] = peso_gerado
+                linha_nova['range_start'] = round(peso_gerado, 3)
+                linha_nova['range_end'] = round(peso_gerado, 3)
                 linha_nova['price'] = round(preco_calculado, 2)
+                
                 novas_linhas_geradas.append(linha_nova)
                 
-                peso_gerado += incremento_kg
+                peso_gerado = round(peso_gerado + incremento_kg, 3)
     
     if novas_linhas_geradas:
         df_novas_linhas = pd.DataFrame(novas_linhas_geradas)
         return pd.concat([df_base, df_novas_linhas], ignore_index=True)
+    
     return df_base
+
 
 
 # --- FUNÇÃO PARA APLICAR MARGENS E CRIAR ARQUIVOS EM MEMÓRIA ---
@@ -492,7 +498,7 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
                 else:
                     print("   - Aplicando regras incrementais (a cada 1 kg)...")
                     tabela_not_doc_final = aplicar_regras_incrementais(
-                        tabela_not_doc_final_pre, regras_incrementais, zonas_disponiveis, incremento_kg=1
+                        tabela_not_doc_final_pre, regras_incrementais, zonas_disponiveis, incremento_kg=0.1
                     )
             else:
                 tabela_not_doc_final = tabela_not_doc_final_pre
