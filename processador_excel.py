@@ -112,7 +112,7 @@ def arredondar_peso_comercial(peso):
 def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis, incremento_kg=1):
     """
     Aplica regras incrementais gerando pesos de 0.1 em 0.1 kg (100g em 100g)
-    e calculando preço baseado no peso comercial arredondado para cima.
+    e calculando preço usando o valor incremental por kg baseado no peso comercial.
     """
     if not regras_incrementais:
         return df_base
@@ -123,12 +123,10 @@ def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis,
         if group.empty:
             continue
         
-        # Cria um dicionário de preços por peso da tabela base para consulta rápida
-        precos_base = {}
-        for _, row in group.iterrows():
-            peso_base = round(float(row['range_start']), 1)
-            preco_base = float(row['price'])
-            precos_base[peso_base] = preco_base
+        # Pega a última linha da tabela base (maior peso)
+        ultima_linha = group.sort_values('range_start', ascending=False).iloc[0]
+        ultimo_peso = float(ultima_linha['range_start'])
+        ultimo_preco = float(ultima_linha['price'])
         
         for regra in regras_incrementais:
             peso_inicial = float(regra['peso_inicial'])
@@ -138,6 +136,7 @@ def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis,
             if str(zona_letra) not in valores_por_zona:
                 continue
             
+            valor_incremental_por_kg = float(valores_por_zona[str(zona_letra)])
             peso_gerado = peso_inicial
             
             # 🔥 Gera pesos de 0.1 em 0.1 (100g em 100g)
@@ -145,28 +144,14 @@ def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis,
                 # Calcula o peso comercial (arredondado para cima ao 0.5 mais próximo)
                 peso_comercial = arredondar_peso_comercial(peso_gerado)
                 
-                # Busca o preço do peso comercial na tabela base
-                if peso_comercial in precos_base:
-                    preco_calculado = precos_base[peso_comercial]
-                else:
-                    # Se não encontrar o peso exato, busca o mais próximo maior
-                    pesos_disponiveis = sorted(precos_base.keys())
-                    peso_comercial_ajustado = None
-                    for p in pesos_disponiveis:
-                        if p >= peso_comercial:
-                            peso_comercial_ajustado = p
-                            break
-                    
-                    if peso_comercial_ajustado:
-                        preco_calculado = precos_base[peso_comercial_ajustado]
-                    else:
-                        # Se não encontrar, pula este peso
-                        peso_gerado = round(peso_gerado + 0.1, 1)
-                        continue
+                # Calcula quantos kgs foram adicionados (baseado no peso comercial)
+                kgs_adicionados = peso_comercial - ultimo_peso
                 
-                # Pega a última linha como modelo para copiar outros campos
-                ultima_linha = group.iloc[0].to_dict()
-                linha_nova = ultima_linha.copy()
+                # Calcula o preço: último preço + (kgs adicionados × valor incremental)
+                preco_calculado = ultimo_preco + (kgs_adicionados * valor_incremental_por_kg)
+                
+                # Cria nova linha
+                linha_nova = ultima_linha.to_dict()
                 linha_nova['range_start'] = round(peso_gerado, 1)
                 linha_nova['range_end'] = round(peso_gerado, 1)
                 linha_nova['price'] = round(preco_calculado, 2)
@@ -218,20 +203,20 @@ def aplicar_margens_e_criar_arquivos_em_memoria(df_base, nome_base_arquivo, adic
     plano = ['Lap', 'Special', 'Partner', 'Pro', 'Scaleup', 'Startup']
     margem = [1, 1.15, 1.2, 1.33, 1.4, 1.7, 1.9]
     colunas_margem = ['price', 'exceeding_price_300', 'exceeding_price_1000']
-    
+
     for i, nome_plano in enumerate(plano):
         df_margem = df_base.copy()
         df_margem['country'] = df_margem['country'].apply(unidecode.unidecode)
         
         for col in colunas_margem:
             if col in df_margem.columns:
-                df_margem[col] = round((df_margem[col].astype(float) / margem[i]) * margem[i+1], 2)
+                 df_margem[col] = round((df_margem[col].astype(float) / margem[i]) * margem[i+1], 2)
         
         csv_string = df_margem.to_csv(index=False, sep=';', decimal='.', 
                                      float_format='%.10g', encoding='cp1252')
         # Nome sem "_margem" - apenas o plano direto
         arquivos_gerados.append({'nome': f"{nome_base_arquivo}_{nome_plano}.csv", 'dados': csv_string})
-    
+        
     return arquivos_gerados
 
 
@@ -292,14 +277,14 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
         else:
             # Processa cada aba de preços conforme configurado
             abas_de_preco = config['abas_preco']
-        
-        for nome_da_aba in abas_de_preco:
+
+    for nome_da_aba in abas_de_preco:
             # Verifica se a aba existe no arquivo
             if nome_da_aba not in xls.sheet_names:
                 print(f"Aviso: Aba '{nome_da_aba}' não encontrada no arquivo. Pulando...")
                 continue
                 
-            print(f"\n--- Processando a aba: '{nome_da_aba}' ---")
+        print(f"\n--- Processando a aba: '{nome_da_aba}' ---")
             
             # Lê a aba de zonas correspondente
             aba_zona = config['mapa_abas_zonas'][nome_da_aba]
@@ -323,8 +308,8 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
                 print(f"   - Zonas processadas: {len(df_zonas)} países (ISO adicionado automaticamente)")
             
             # Lê a aba de preços
-            df_raw = pd.read_excel(xls, sheet_name=nome_da_aba, header=None)
-            
+        df_raw = pd.read_excel(xls, sheet_name=nome_da_aba, header=None)
+        
             # A linha 1 contém as zonas (A, B, C, ...)
             zonas_disponiveis_raw = df_raw.iloc[1, 1:].dropna().tolist()
             zonas_disponiveis = [z for z in zonas_disponiveis_raw if z != 'Kgs']
@@ -580,7 +565,7 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
         print(f"Total de arquivos gerados: {len(todos_os_arquivos_finais)}")
         print("="*60)
         
-        return todos_os_arquivos_finais
+    return todos_os_arquivos_finais
     
     except FileNotFoundError:
         print(f"ERRO: O arquivo não foi encontrado")
