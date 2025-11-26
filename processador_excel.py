@@ -277,14 +277,14 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
         else:
             # Processa cada aba de preços conforme configurado
             abas_de_preco = config['abas_preco']
-
-    for nome_da_aba in abas_de_preco:
+        
+        for nome_da_aba in abas_de_preco:
             # Verifica se a aba existe no arquivo
             if nome_da_aba not in xls.sheet_names:
                 print(f"Aviso: Aba '{nome_da_aba}' não encontrada no arquivo. Pulando...")
                 continue
                 
-        print(f"\n--- Processando a aba: '{nome_da_aba}' ---")
+            print(f"\n--- Processando a aba: '{nome_da_aba}' ---")
             
             # Lê a aba de zonas correspondente
             aba_zona = config['mapa_abas_zonas'][nome_da_aba]
@@ -308,8 +308,8 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
                 print(f"   - Zonas processadas: {len(df_zonas)} países (ISO adicionado automaticamente)")
             
             # Lê a aba de preços
-        df_raw = pd.read_excel(xls, sheet_name=nome_da_aba, header=None)
-        
+            df_raw = pd.read_excel(xls, sheet_name=nome_da_aba, header=None)
+            
             # A linha 1 contém as zonas (A, B, C, ...)
             zonas_disponiveis_raw = df_raw.iloc[1, 1:].dropna().tolist()
             zonas_disponiveis = [z for z in zonas_disponiveis_raw if z != 'Kgs']
@@ -565,7 +565,7 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
         print(f"Total de arquivos gerados: {len(todos_os_arquivos_finais)}")
         print("="*60)
         
-    return todos_os_arquivos_finais
+        return todos_os_arquivos_finais
     
     except FileNotFoundError:
         print(f"ERRO: O arquivo não foi encontrado")
