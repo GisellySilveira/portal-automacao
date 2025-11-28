@@ -6,7 +6,7 @@ PAISES_DATABASE = {
     'AD': ['Andorra', 'Andorra', 'Andorra'],
     'AE': ['United Arab Emirates', 'Emirados Árabes Unidos', 'Emiratos Árabes Unidos'],
     'AF': ['Afghanistan', 'Afeganistão', 'Afganistán'],
-    'AG': ['Antigua and Barbuda', 'Antígua e Barbuda', 'Antigua y Barbuda'],
+    'AG': ['Antigua & Barbuda', 'Antígua e Barbuda', 'Antigua y Barbuda'],
     'AI': ['Anguilla', 'Anguila', 'Anguila'],
     'AL': ['Albania', 'Albânia', 'Albania'],
     'AM': ['Armenia', 'Armênia', 'Armenia'],
@@ -31,9 +31,9 @@ PAISES_DATABASE = {
     'BM': ['Bermuda', 'Bermudas', 'Bermudas'],
     'BN': ['Brunei', 'Brunei', 'Brunéi'],
     'BO': ['Bolivia', 'Bolívia', 'Bolivia'],
-    'BQ': ['Bonaire, Sint Eustatius and Saba','Bonaire, Santo Eustáquio e Saba','Bonaire, San Eustaquio y Saba' ],
+    'BQ': ['Bonaire Sint Eustatius and Saba','Bonaire Santo Eustáquio e Saba','Bonaire San Eustaquio y Saba' ],
     'BR': ['Brazil', 'Brasil', 'Brasil'],
-    'BS': ['Bahamas', 'Bahamas', 'Bahamas'],
+    'BS': ['Bahama', 'Bahamas', 'Bahamas'],
     'BT': ['Bhutan', 'Butão', 'Bután'],
     'BV': ['Bouvet Island', 'Ilha Bouvet', 'Isla Bouvet'],
     'BW': ['Botswana', 'Botsuana', 'Botsuana'],
@@ -54,7 +54,7 @@ PAISES_DATABASE = {
     'CR': ['Costa Rica', 'Costa Rica', 'Costa Rica'],
     'CU': ['Cuba', 'Cuba', 'Cuba'],
     'CV': ['Cape Verde', 'Cabo Verde', 'Cabo Verde'],
-    'CW': ['Curaçao', 'Curaçao', 'Curazao'],
+    'CW': ['Curacao', 'Curaçao', 'Curazao'],
     'CX': ['Christmas Island', 'Ilha Christmas', 'Isla Christmas'],
     'CY': ['Cyprus', 'Chipre', 'Chipre'],
     'CZ': ['Czech Republic', 'República Tcheca', 'República Checa'],
@@ -75,7 +75,7 @@ PAISES_DATABASE = {
     'FJ': ['Fiji', 'Fiji', 'Fiyi'],
     'FK': ['Falkland Islands', 'Ilhas Malvinas', 'Islas Malvinas'],
     'FM': ['Micronesia', 'Micronésia', 'Micronesia'],
-    'FO': ['Faroe Islands', 'Ilhas Faroé', 'Islas Feroe'],
+    'FO': ['Faeroe Islands', 'Ilhas Faroé', 'Islas Feroe'],
     'FR': ['France', 'França', 'Francia'],
     'GA': ['Gabon', 'Gabão', 'Gabón'],
     'GB': ['United Kingdom', 'Reino Unido', 'Reino Unido'],
@@ -96,7 +96,7 @@ PAISES_DATABASE = {
     'GU': ['Guam', 'Guam', 'Guam'],
     'GW': ['Guinea-Bissau', 'Guiné-Bissau', 'Guinea-Bisáu'],
     'GY': ['Guyana', 'Guiana', 'Guyana'],
-    'HK': ['Hong Kong', 'Hong Kong', 'Hong Kong'],
+    'HK': ['Hong Kong SAR, China', 'Hong Kong', 'Hong Kong'],
     'HM': ['Heard Island and McDonald Islands', 'Ilhas Heard e McDonald', 'Islas Heard y McDonald'],
     'HN': ['Honduras', 'Honduras', 'Honduras'],
     'HR': ['Croatia', 'Croácia', 'Croacia'],
@@ -149,7 +149,7 @@ PAISES_DATABASE = {
     'ML': ['Mali', 'Mali', 'Malí'],
     'MM': ['Myanmar', 'Mianmar', 'Birmania'],
     'MN': ['Mongolia', 'Mongólia', 'Mongolia'],
-    'MO': ['Macau', 'Macau', 'Macao'],
+    'MO': ['Macau SAR, China', 'Macau', 'Macao'],
     'MP': ['Northern Mariana Islands', 'Ilhas Marianas do Norte', 'Islas Marianas del Norte'],
     'MQ': ['Martinique', 'Martinica', 'Martinica'],
     'MR': ['Mauritania', 'Mauritânia', 'Mauritania'],
@@ -222,7 +222,7 @@ PAISES_DATABASE = {
     'TH': ['Thailand', 'Tailândia', 'Tailandia'],
     'TJ': ['Tajikistan', 'Tajiquistão', 'Tayikistán'],
     'TK': ['Tokelau', 'Tokelau', 'Tokelau'],
-    'TL': ['Timor-Leste', 'Timor-Leste', 'Timor Oriental'],
+    'TL': ['East Timor ', 'Timor-Leste', 'Timor Oriental'],
     'TM': ['Turkmenistan', 'Turcomenistão', 'Turkmenistán'],
     'TN': ['Tunisia', 'Tunísia', 'Túnez'],
     'TO': ['Tonga', 'Tonga', 'Tonga'],
@@ -341,6 +341,7 @@ def processar_tabela_com_banco_paises(df_zonas):
         })
     
     return pd.DataFrame(resultado)
+
 
 
 
