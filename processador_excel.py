@@ -232,7 +232,7 @@ def aplicar_margens_e_criar_arquivos_em_memoria(df_base, nome_base_arquivo, adic
 
 
 # --- FUNÇÃO PRINCIPAL DE PROCESSAMENTO ---
-def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome_cliente='', adicionar_margem=True, taxa_conversao=1.0, incremento_peso=0.1, converter_lb_para_kg=False, markups_por_servico=None, gerar_importacao=False, pais_importacao=None, iso_importacao=None):
+def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome_cliente='', adicionar_margem=True, taxa_conversao=1.0, incremento_peso=0.1, converter_lb_para_kg=False, servicos_filtrar=None, gerar_importacao=False, pais_importacao=None, iso_importacao=None):
     """
     Processa arquivo Excel de tabelas de frete de acordo com a transportadora escolhida
     
@@ -244,7 +244,7 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
         taxa_conversao: Taxa de conversão de moeda (ex: 1.17 para converter EUR para USD)
         incremento_peso: Incremento de peso em kg (0.1 para 100g, 0.5 para 500g, 1.0 para 1kg)
         converter_lb_para_kg: Se True, converte pesos de libras (lb) para quilogramas (kg)
-        markups_por_servico: Dicionário com markups por serviço (ex: {'Priority': 1.15, 'Economy': 1.20})
+        servicos_filtrar: Lista de serviços a processar (ex: ['Priority', 'Economy']) ou None para todos
         gerar_importacao: Se True, gera tabela de importação com país único
         pais_importacao: Nome do país de destino para tabela de importação
         iso_importacao: Código ISO do país para tabela de importação
@@ -299,6 +299,11 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
             # Verifica se a aba existe no arquivo
             if nome_da_aba not in xls.sheet_names:
                 print(f"Aviso: Aba '{nome_da_aba}' não encontrada no arquivo. Pulando...")
+                continue
+            
+            # Filtra serviços se especificado (para FEDEX principalmente)
+            if servicos_filtrar is not None and nome_da_aba not in servicos_filtrar:
+                print(f"Pulando aba '{nome_da_aba}' (não selecionada pelo usuário)")
                 continue
                 
             print(f"\n--- Processando a aba: '{nome_da_aba}' ---")
@@ -501,13 +506,6 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
             if taxa_conversao != 1.0:
                 print(f"   - Aplicando taxa de conversão de moeda: {taxa_conversao}")
                 df_precos['price'] = df_precos['price'] * taxa_conversao
-            
-            # Aplica markup personalizado por serviço se configurado
-            if markups_por_servico and nome_da_aba in markups_por_servico:
-                markup = markups_por_servico[nome_da_aba]
-                if markup != 1.0:
-                    print(f"   - Aplicando markup de {markup:.2%} para {nome_da_aba}")
-                    df_precos['price'] = df_precos['price'] * markup
             
             df_precos['price'] = df_precos['price'].round(2)
             

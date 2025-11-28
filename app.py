@@ -111,14 +111,15 @@ elif escolha_topico == "Tabelas de Frete":
             
             # Opções avançadas
             with st.expander("⚙️ Configurações Avançadas"):
-                st.markdown("### 📊 Markups Personalizados por Serviço")
+                st.markdown("### 📊 Selecionar Serviços para Processar")
+                st.info("Escolha quais serviços da FedEx você deseja processar:")
                 col_priority, col_economy, col_cp = st.columns(3)
                 with col_priority:
-                    markup_priority = st.number_input("Priority (%)", min_value=0.0, max_value=500.0, value=100.0, step=5.0, key="markup_priority_fedex", help="100 = sem markup, 115 = +15%")
+                    processar_priority = st.checkbox("✈️ Priority", value=True, key="proc_priority_fedex")
                 with col_economy:
-                    markup_economy = st.number_input("Economy (%)", min_value=0.0, max_value=500.0, value=100.0, step=5.0, key="markup_economy_fedex", help="100 = sem markup, 120 = +20%")
+                    processar_economy = st.checkbox("📦 Economy", value=True, key="proc_economy_fedex")
                 with col_cp:
-                    markup_cp = st.number_input("CP (%)", min_value=0.0, max_value=500.0, value=100.0, step=5.0, key="markup_cp_fedex", help="100 = sem markup, 110 = +10%")
+                    processar_cp = st.checkbox("📮 CP", value=True, key="proc_cp_fedex")
                 
                 st.markdown("### 🌍 Tabela de Importação")
                 gerar_importacao_fedex = st.checkbox("Gerar tabela de importação", value=False, key="import_fedex", help="Gera tabela por zona com país único de destino")
@@ -139,39 +140,44 @@ elif escolha_topico == "Tabelas de Frete":
                     else:
                         with st.spinner("Aguarde... Processando a planilha FedEx..."):
                             try:
-                                # Prepara markups personalizados por serviço
-                                markups_servicos = {
-                                    'Priority': markup_priority / 100.0,
-                                    'Economy': markup_economy / 100.0,
-                                    'CP': markup_cp / 100.0
-                                }
+                                # Prepara lista de serviços a processar
+                                servicos_processar = []
+                                if processar_priority:
+                                    servicos_processar.append('Priority')
+                                if processar_economy:
+                                    servicos_processar.append('Economy')
+                                if processar_cp:
+                                    servicos_processar.append('CP')
                                 
-                                arquivos_gerados = processar_arquivo_excel(
-                                    arquivo_excel_fedex, 
-                                    transportadora='FEDEX',
-                                    nome_cliente=nome_cliente_fedex.strip(),
-                                    adicionar_margem=adicionar_margem_fedex,
-                                    taxa_conversao=taxa_conversao_fedex if usar_conversao_fedex else 1.0,
-                                    incremento_peso=incremento_fedex,
-                                    converter_lb_para_kg=converter_peso_fedex,
-                                    markups_por_servico=markups_servicos,
-                                    gerar_importacao=gerar_importacao_fedex,
-                                    pais_importacao=pais_importacao_fedex if gerar_importacao_fedex else None,
-                                    iso_importacao=iso_importacao_fedex if gerar_importacao_fedex else None
-                                )
+                                if not servicos_processar:
+                                    st.error("❌ Selecione pelo menos um serviço para processar!")
+                                else:
+                                    arquivos_gerados = processar_arquivo_excel(
+                                        arquivo_excel_fedex, 
+                                        transportadora='FEDEX',
+                                        nome_cliente=nome_cliente_fedex.strip(),
+                                        adicionar_margem=adicionar_margem_fedex,
+                                        taxa_conversao=taxa_conversao_fedex if usar_conversao_fedex else 1.0,
+                                        incremento_peso=incremento_fedex,
+                                        converter_lb_para_kg=converter_peso_fedex,
+                                        servicos_filtrar=servicos_processar,
+                                        gerar_importacao=gerar_importacao_fedex,
+                                        pais_importacao=pais_importacao_fedex if gerar_importacao_fedex else None,
+                                        iso_importacao=iso_importacao_fedex if gerar_importacao_fedex else None
+                                    )
                                 if arquivos_gerados:
                                     zip_buffer = io.BytesIO()
                                     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zf:
                                         for arquivo in arquivos_gerados:
                                             zf.writestr(arquivo['nome'], arquivo['dados'])
                                     
-                                    st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
+                                        st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
                                     st.download_button(
-                                        label="📥 Baixar Todos os Arquivos (.zip)", 
-                                        data=zip_buffer.getvalue(),
-                                        file_name="resultados_FedEx.zip", 
-                                        mime="application/zip",
-                                        use_container_width=True
+                                            label="📥 Baixar Todos os Arquivos (.zip)", 
+                                            data=zip_buffer.getvalue(),
+                                            file_name="resultados_FedEx.zip", 
+                                            mime="application/zip",
+                                            use_container_width=True
                                     )
                                 else:
                                     st.warning("Nenhum arquivo foi gerado.")
