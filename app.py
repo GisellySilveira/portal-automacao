@@ -78,21 +78,36 @@ elif escolha_topico == "Tabelas de Frete":
             nome_cliente_fedex = st.text_input("Nome do Cliente*:", key="nome_cliente_fedex", 
                                                placeholder="Ex: ClienteXYZ")
             
-            # Conversão de moeda e margem
-            col_conversao, col_margem = st.columns(2)
-            with col_conversao:
-                usar_conversao_fedex = st.checkbox("Usar conversão de moeda", value=False, key="usar_conv_fedex")
-                taxa_conversao_fedex = st.number_input("Taxa de Conversão:", 
+            # Configurações em 4 colunas
+            col_conv_moeda, col_margem, col_incremento, col_conv_peso = st.columns(4)
+            
+            with col_conv_moeda:
+                usar_conversao_fedex = st.checkbox("💱 Conversão de moeda", value=False, key="usar_conv_fedex")
+                taxa_conversao_fedex = st.number_input("Taxa:", 
                                                       min_value=0.01, 
                                                       value=1.0, 
                                                       step=0.01,
                                                       format="%.2f",
                                                       key="taxa_fedex",
-                                                      help="Ex: 1.17 para converter EUR → USD",
+                                                      help="Ex: 1.17 para EUR → USD",
                                                       disabled=not usar_conversao_fedex)
+            
             with col_margem:
-                adicionar_margem_fedex = st.checkbox("Gerar arquivos com margem", 
+                adicionar_margem_fedex = st.checkbox("📊 Gerar margem", 
                                                      value=True, key="margem_fedex")
+            
+            with col_incremento:
+                incremento_fedex = st.selectbox(
+                    "⚖️ Incremento:",
+                    options=[0.1, 0.5, 1.0],
+                    format_func=lambda x: f"{x} kg ({int(x*1000)}g)",
+                    key="incremento_fedex",
+                    help="De quanto em quanto o peso aumenta"
+                )
+            
+            with col_conv_peso:
+                converter_peso_fedex = st.checkbox("🔄 lb → kg", value=False, key="conv_peso_fedex",
+                                                   help="Converte pesos de libras para quilogramas")
             
             arquivo_excel_fedex = st.file_uploader("Escolha a planilha FedEx", type=["xlsx", "xls"], key="fedex_excel")
                 
@@ -109,7 +124,9 @@ elif escolha_topico == "Tabelas de Frete":
                                     transportadora='FEDEX',
                                     nome_cliente=nome_cliente_fedex.strip(),
                                     adicionar_margem=adicionar_margem_fedex,
-                                    taxa_conversao=taxa_conversao_fedex if usar_conversao_fedex else 1.0
+                                    taxa_conversao=taxa_conversao_fedex if usar_conversao_fedex else 1.0,
+                                    incremento_peso=incremento_fedex,
+                                    converter_lb_para_kg=converter_peso_fedex
                                 )
                                 if arquivos_gerados:
                                     zip_buffer = io.BytesIO()
@@ -145,21 +162,36 @@ elif escolha_topico == "Tabelas de Frete":
             nome_cliente_ups = st.text_input("Nome do Cliente*:", key="nome_cliente_ups", 
                                             placeholder="Ex: ClienteXYZ")
             
-            # Conversão de moeda e margem
-            col_conversao, col_margem = st.columns(2)
-            with col_conversao:
-                usar_conversao_ups = st.checkbox("Usar conversão de moeda", value=False, key="usar_conv_ups")
-                taxa_conversao_ups = st.number_input("Taxa de Conversão:", 
+            # Configurações em 4 colunas
+            col_conv_moeda, col_margem, col_incremento, col_conv_peso = st.columns(4)
+            
+            with col_conv_moeda:
+                usar_conversao_ups = st.checkbox("💱 Conversão de moeda", value=False, key="usar_conv_ups")
+                taxa_conversao_ups = st.number_input("Taxa:", 
                                                     min_value=0.01, 
                                                     value=1.0, 
                                                     step=0.01,
                                                     format="%.2f",
                                                     key="taxa_ups",
-                                                    help="Ex: 1.17 para converter EUR → USD",
+                                                    help="Ex: 1.17 para EUR → USD",
                                                     disabled=not usar_conversao_ups)
+            
             with col_margem:
-                adicionar_margem_ups = st.checkbox("Gerar arquivos com margem", 
+                adicionar_margem_ups = st.checkbox("📊 Gerar margem", 
                                                   value=True, key="margem_ups")
+            
+            with col_incremento:
+                incremento_ups = st.selectbox(
+                    "⚖️ Incremento:",
+                    options=[0.1, 0.5, 1.0],
+                    format_func=lambda x: f"{x} kg ({int(x*1000)}g)",
+                    key="incremento_ups",
+                    help="De quanto em quanto o peso aumenta"
+                )
+            
+            with col_conv_peso:
+                converter_peso_ups = st.checkbox("🔄 lb → kg", value=False, key="conv_peso_ups",
+                                                 help="Converte pesos de libras para quilogramas")
             
             arquivo_excel_ups = st.file_uploader("Escolha a planilha UPS", type=["xlsx", "xls"], key="ups_excel")
             
@@ -175,7 +207,9 @@ elif escolha_topico == "Tabelas de Frete":
                                     transportadora='UPS',
                                     nome_cliente=nome_cliente_ups.strip(),
                                     adicionar_margem=adicionar_margem_ups,
-                                    taxa_conversao=taxa_conversao_ups if usar_conversao_ups else 1.0
+                                    taxa_conversao=taxa_conversao_ups if usar_conversao_ups else 1.0,
+                                    incremento_peso=incremento_ups,
+                                    converter_lb_para_kg=converter_peso_ups
                                 )
                                 if arquivos_gerados:
                                     zip_buffer = io.BytesIO()
@@ -211,21 +245,36 @@ elif escolha_topico == "Tabelas de Frete":
             nome_cliente_dhl = st.text_input("Nome do Cliente*:", key="nome_cliente_dhl", 
                                             placeholder="Ex: ClienteXYZ")
             
-            # Conversão de moeda e margem
-            col_conversao, col_margem = st.columns(2)
-            with col_conversao:
-                usar_conversao_dhl = st.checkbox("Usar conversão de moeda", value=False, key="usar_conv_dhl")
-                taxa_conversao_dhl = st.number_input("Taxa de Conversão:", 
+            # Configurações em 4 colunas
+            col_conv_moeda, col_margem, col_incremento, col_conv_peso = st.columns(4)
+            
+            with col_conv_moeda:
+                usar_conversao_dhl = st.checkbox("💱 Conversão de moeda", value=False, key="usar_conv_dhl")
+                taxa_conversao_dhl = st.number_input("Taxa:", 
                                                     min_value=0.01, 
                                                     value=1.0, 
                                                     step=0.01,
                                                     format="%.2f",
                                                     key="taxa_dhl",
-                                                    help="Ex: 1.17 para converter EUR → USD",
+                                                    help="Ex: 1.17 para EUR → USD",
                                                     disabled=not usar_conversao_dhl)
+            
             with col_margem:
-                adicionar_margem_dhl = st.checkbox("Gerar arquivos com margem", 
+                adicionar_margem_dhl = st.checkbox("📊 Gerar margem", 
                                                   value=True, key="margem_dhl")
+            
+            with col_incremento:
+                incremento_dhl = st.selectbox(
+                    "⚖️ Incremento:",
+                    options=[0.1, 0.5, 1.0],
+                    format_func=lambda x: f"{x} kg ({int(x*1000)}g)",
+                    key="incremento_dhl",
+                    help="De quanto em quanto o peso aumenta"
+                )
+            
+            with col_conv_peso:
+                converter_peso_dhl = st.checkbox("🔄 lb → kg", value=False, key="conv_peso_dhl",
+                                                 help="Converte pesos de libras para quilogramas")
             
             arquivo_excel_dhl = st.file_uploader("Escolha a planilha DHL", type=["xlsx", "xls"], key="dhl_excel")
             
@@ -241,7 +290,9 @@ elif escolha_topico == "Tabelas de Frete":
                                     transportadora='DHL',
                                     nome_cliente=nome_cliente_dhl.strip(),
                                     adicionar_margem=adicionar_margem_dhl,
-                                    taxa_conversao=taxa_conversao_dhl if usar_conversao_dhl else 1.0
+                                    taxa_conversao=taxa_conversao_dhl if usar_conversao_dhl else 1.0,
+                                    incremento_peso=incremento_dhl,
+                                    converter_lb_para_kg=converter_peso_dhl
                                 )
                                 if arquivos_gerados:
                                     zip_buffer = io.BytesIO()
@@ -270,34 +321,46 @@ elif escolha_topico == "Tabelas de Frete":
         st.markdown("### Processador Genérico")
         st.info("⚠️ **Atenção:** Esta opção processa qualquer transportadora. Certifique-se de que o arquivo Excel segue o formato padrão.")
         
-        # Layout em duas colunas
-        col_left, col_right = st.columns(2)
-        
-        with col_left:
-            # Campo obrigatório para nome do cliente
+        # Campos de cliente e transportadora
+        col_cliente, col_transp = st.columns(2)
+        with col_cliente:
             nome_cliente_outras = st.text_input("Nome do Cliente*:", key="nome_cliente_outras", 
                                                placeholder="Ex: ClienteXYZ")
-            
-            # NOVO: Campo para nome da transportadora
+        with col_transp:
             nome_transportadora_outras = st.text_input("Nome da Transportadora*:", key="nome_transportadora_outras",
                                                       placeholder="Ex: TNT, Aramex, etc.",
                                                       help="Este nome aparecerá nos arquivos gerados")
         
-        with col_right:
-            # Conversão de moeda
-            usar_conversao_outras = st.checkbox("Usar conversão de moeda", value=False, key="usar_conv_outras")
-            taxa_conversao_outras = st.number_input("Taxa de Conversão:", 
+        # Configurações em 4 colunas
+        col_conv_moeda, col_margem, col_incremento, col_conv_peso = st.columns(4)
+        
+        with col_conv_moeda:
+            usar_conversao_outras = st.checkbox("💱 Conversão de moeda", value=False, key="usar_conv_outras")
+            taxa_conversao_outras = st.number_input("Taxa:", 
                                                    min_value=0.01, 
                                                    value=1.0, 
                                                    step=0.01,
                                                    format="%.2f",
                                                    key="taxa_outras",
-                                                   help="Ex: 1.17 para converter EUR → USD",
+                                                   help="Ex: 1.17 para EUR → USD",
                                                    disabled=not usar_conversao_outras)
-            
-            # Checkbox de margem
-            adicionar_margem_outras = st.checkbox("Gerar arquivos com margem", 
+        
+        with col_margem:
+            adicionar_margem_outras = st.checkbox("📊 Gerar margem", 
                                                  value=True, key="margem_outras")
+        
+        with col_incremento:
+            incremento_outras = st.selectbox(
+                "⚖️ Incremento:",
+                options=[0.1, 0.5, 1.0],
+                format_func=lambda x: f"{x} kg ({int(x*1000)}g)",
+                key="incremento_outras",
+                help="De quanto em quanto o peso aumenta"
+            )
+        
+        with col_conv_peso:
+            converter_peso_outras = st.checkbox("🔄 lb → kg", value=False, key="conv_peso_outras",
+                                               help="Converte pesos de libras para quilogramas")
         
         # Upload do arquivo
         arquivo_excel_outras = st.file_uploader("Escolha a planilha da transportadora", 
@@ -317,7 +380,9 @@ elif escolha_topico == "Tabelas de Frete":
                                 transportadora=nome_transportadora_outras.strip().upper(),
                                 nome_cliente=nome_cliente_outras.strip(),
                                 adicionar_margem=adicionar_margem_outras,
-                                taxa_conversao=taxa_conversao_outras if usar_conversao_outras else 1.0
+                                taxa_conversao=taxa_conversao_outras if usar_conversao_outras else 1.0,
+                                incremento_peso=incremento_outras,
+                                converter_lb_para_kg=converter_peso_outras
                             )
                             if arquivos_gerados:
                                 zip_buffer = io.BytesIO()

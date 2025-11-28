@@ -109,15 +109,26 @@ def arredondar_peso_comercial(peso):
 
 
 # --- FUNÇÃO PARA APLICAR REGRAS INCREMENTAIS ---
-def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis, incremento_kg=1):
+def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis, incremento_kg=0.1):
     """
-    Aplica regras incrementais gerando pesos de 0.1 em 0.1 kg (100g em 100g)
+    Aplica regras incrementais gerando pesos conforme incremento escolhido (0.1, 0.5 ou 1.0 kg)
     e calculando preço usando o valor incremental por kg baseado no peso comercial.
+    
+    Args:
+        incremento_kg: 0.1 (100g), 0.5 (500g) ou 1.0 (1kg)
     """
     if not regras_incrementais:
         return df_base
     
     novas_linhas_geradas = []
+    
+    # Define precisão baseada no incremento
+    if incremento_kg == 0.1:
+        precisao = 1  # Uma casa decimal
+    elif incremento_kg == 0.5:
+        precisao = 1  # Uma casa decimal
+    else:
+        precisao = 0  # Sem decimais
     
     for (iso, country, zona_letra), group in df_base.groupby(['iso', 'country', 'Zona_Letra']):
         if group.empty:
@@ -139,8 +150,8 @@ def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis,
             valor_incremental_por_kg = float(valores_por_zona[str(zona_letra)])
             peso_gerado = peso_inicial
             
-            # 🔥 Gera pesos de 0.1 em 0.1 (100g em 100g)
-            while round(peso_gerado, 1) <= peso_final:
+            # Gera pesos conforme o incremento escolhido
+            while round(peso_gerado, precisao) <= peso_final:
                 # Calcula o peso comercial (arredondado para cima ao 0.5 mais próximo)
                 peso_comercial = arredondar_peso_comercial(peso_gerado)
                 
@@ -152,13 +163,13 @@ def aplicar_regras_incrementais(df_base, regras_incrementais, zonas_disponiveis,
                 
                 # Cria nova linha
                 linha_nova = ultima_linha.to_dict()
-                linha_nova['range_start'] = round(peso_gerado, 1)
-                linha_nova['range_end'] = round(peso_gerado, 1)
+                linha_nova['range_start'] = round(peso_gerado, precisao)
+                linha_nova['range_end'] = round(peso_gerado, precisao)
                 linha_nova['price'] = round(preco_calculado, 2)
                 
                 novas_linhas_geradas.append(linha_nova)
                 
-                peso_gerado = round(peso_gerado + 0.1, 1)
+                peso_gerado = round(peso_gerado + incremento_kg, precisao)
     
     if novas_linhas_geradas:
         df_novas_linhas = pd.DataFrame(novas_linhas_geradas)
@@ -221,7 +232,7 @@ def aplicar_margens_e_criar_arquivos_em_memoria(df_base, nome_base_arquivo, adic
 
 
 # --- FUNÇÃO PRINCIPAL DE PROCESSAMENTO ---
-def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome_cliente='', adicionar_margem=True, taxa_conversao=1.0):
+def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome_cliente='', adicionar_margem=True, taxa_conversao=1.0, incremento_peso=0.1, converter_lb_para_kg=False):
     """
     Processa arquivo Excel de tabelas de frete de acordo com a transportadora escolhida
     
@@ -231,6 +242,8 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
         nome_cliente: Nome do cliente (opcional) para personalizar nome dos arquivos
         adicionar_margem: Se True, gera arquivos com diferentes margens. Se False, gera apenas arquivo base.
         taxa_conversao: Taxa de conversão de moeda (ex: 1.17 para converter EUR para USD)
+        incremento_peso: Incremento de peso em kg (0.1 para 100g, 0.5 para 500g, 1.0 para 1kg)
+        converter_lb_para_kg: Se True, converte pesos de libras (lb) para quilogramas (kg)
     
     Returns:
         Lista de dicionários com {'nome': nome_arquivo, 'dados': conteudo_csv}
@@ -277,7 +290,7 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
         else:
             # Processa cada aba de preços conforme configurado
             abas_de_preco = config['abas_preco']
-        
+
         for nome_da_aba in abas_de_preco:
             # Verifica se a aba existe no arquivo
             if nome_da_aba not in xls.sheet_names:
@@ -309,7 +322,7 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
             
             # Lê a aba de preços
             df_raw = pd.read_excel(xls, sheet_name=nome_da_aba, header=None)
-            
+        
             # A linha 1 contém as zonas (A, B, C, ...)
             zonas_disponiveis_raw = df_raw.iloc[1, 1:].dropna().tolist()
             zonas_disponiveis = [z for z in zonas_disponiveis_raw if z != 'Kgs']
@@ -473,9 +486,16 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
             )
             df_precos.dropna(subset=['price'], inplace=True)
             
+            # Aplica conversão de peso de lb para kg se necessário
+            if converter_lb_para_kg:
+                print("   - Convertendo pesos de libras (lb) para quilogramas (kg)...")
+                fator_conversao_lb_para_kg = 0.453592
+                df_precos['range_start'] = (df_precos['range_start'] * fator_conversao_lb_para_kg).round(1)
+                df_precos['range_end'] = (df_precos['range_end'] * fator_conversao_lb_para_kg).round(1)
+            
             # Aplica conversão de moeda se necessário
             if taxa_conversao != 1.0:
-                print(f"   - Aplicando taxa de conversão: {taxa_conversao}")
+                print(f"   - Aplicando taxa de conversão de moeda: {taxa_conversao}")
                 df_precos['price'] = df_precos['price'] * taxa_conversao
             
             df_precos['price'] = df_precos['price'].round(2)
@@ -512,12 +532,17 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
             
             tabela_not_doc_final_pre = df_final[df_final['Tipo'] == 'Package'].copy()
             
-            # Aplica regras incrementais (sempre de 100 em 100 gramas = 0.1 kg)
+            # Aplica regras incrementais com o incremento escolhido
             if regras_incrementais:
-                print("   - Aplicando regras incrementais (a cada 100g = 0.1 kg)...")
+                if incremento_peso == 0.1:
+                    print("   - Aplicando regras incrementais (a cada 100g = 0.1 kg)...")
+                elif incremento_peso == 0.5:
+                    print("   - Aplicando regras incrementais (a cada 500g = 0.5 kg)...")
+                else:
+                    print(f"   - Aplicando regras incrementais (a cada {incremento_peso} kg)...")
                 print("   - Preços baseados no peso comercial arredondado para cima (0.5, 1.0, 1.5, 2.0...)")
                 tabela_not_doc_final = aplicar_regras_incrementais(
-                    tabela_not_doc_final_pre, regras_incrementais, zonas_disponiveis
+                    tabela_not_doc_final_pre, regras_incrementais, zonas_disponiveis, incremento_kg=incremento_peso
                 )
             else:
                 tabela_not_doc_final = tabela_not_doc_final_pre
@@ -560,10 +585,10 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
             print(f"   - Documentos: {len(tabela_doc_final)} registros")
             print(f"   - Não-Documentos: {len(tabela_not_doc_final)} registros")
         
-        print("\n" + "="*60)
-        print(f"[OK] PROCESSAMENTO DE {transportadora} CONCLUÍDO COM SUCESSO!")
-        print(f"Total de arquivos gerados: {len(todos_os_arquivos_finais)}")
-        print("="*60)
+            print("\n" + "="*60)
+            print(f"[OK] PROCESSAMENTO DE {transportadora} CONCLUÍDO COM SUCESSO!")
+            print(f"Total de arquivos gerados: {len(todos_os_arquivos_finais)}")
+            print("="*60)
         
         return todos_os_arquivos_finais
     
