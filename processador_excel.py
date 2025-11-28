@@ -574,6 +574,11 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
             tabela_doc_final.sort_values(by=['country', 'range_end'], inplace=True)
             tabela_not_doc_final.sort_values(by=['country', 'range_end'], inplace=True)
             
+            # Guarda a coluna Zona_Letra antes de remover (para uso na importação)
+            if gerar_importacao:
+                tabela_doc_final_com_zona = tabela_doc_final.copy()
+                tabela_not_doc_final_com_zona = tabela_not_doc_final.copy()
+            
             # Remove colunas auxiliares
             tabela_doc_final.drop(columns=['Tipo', 'range_start', 'Zona_Letra'], inplace=True, errors='ignore')
             tabela_not_doc_final.drop(columns=['Tipo', 'range_start', 'Zona_Letra'], inplace=True, errors='ignore')
@@ -604,40 +609,44 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
             arquivos_not_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_not_doc_final, caminho_base_not_doc, adicionar_margem)
             todos_os_arquivos_finais.extend(arquivos_not_doc)
             
-            # Gera tabela de importação se solicitado (um arquivo por zona)
+            # Gera tabela de importação se solicitado (um arquivo por zona LETRA)
             if gerar_importacao and pais_importacao and iso_importacao:
                 print(f"\n   - Gerando tabelas de importação por zona para {pais_importacao} ({iso_importacao})...")
                 
-                # Pega todas as zonas únicas
-                zonas_unicas = sorted(tabela_doc_final['zone'].unique())
-                print(f"   - Zonas encontradas: {zonas_unicas}")
+                # Pega todas as zonas únicas (LETRAS: A, B, C, D, E, etc.)
+                zonas_letras = sorted(tabela_doc_final_com_zona['Zona_Letra'].unique())
+                print(f"   - Zonas encontradas: {zonas_letras}")
                 
                 total_arquivos_import = 0
                 
-                for zona in zonas_unicas:
-                    # Filtra apenas registros desta zona para doc
-                    tabela_zona_doc = tabela_doc_final[tabela_doc_final['zone'] == zona].copy()
+                for zona_letra in zonas_letras:
+                    # Filtra apenas registros desta zona (letra) para doc
+                    tabela_zona_doc = tabela_doc_final_com_zona[tabela_doc_final_com_zona['Zona_Letra'] == zona_letra].copy()
                     tabela_zona_doc['country'] = pais_importacao
                     tabela_zona_doc['iso'] = iso_importacao
+                    # Remove colunas auxiliares
+                    tabela_zona_doc.drop(columns=['Tipo', 'range_start', 'Zona_Letra'], inplace=True, errors='ignore')
                     
-                    # Nome do arquivo: Cliente_ZonaX_transportadora_Servico_docTable_Plano
-                    caminho_base_zona_doc = f"{prefixo_cliente}Zona{zona}_{transportadora_lower}_{nome_aba_limpo}_docTable"
+                    # Nome do arquivo: Cliente_ZonaA_transportadora_Servico_docTable_Plano
+                    caminho_base_zona_doc = f"{prefixo_cliente}Zona{zona_letra}_{transportadora_lower}_{nome_aba_limpo}_docTable"
                     arquivos_zona_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_zona_doc, caminho_base_zona_doc, adicionar_margem)
                     todos_os_arquivos_finais.extend(arquivos_zona_doc)
                     total_arquivos_import += len(arquivos_zona_doc)
                     
-                    # Filtra apenas registros desta zona para notDoc
-                    tabela_zona_not_doc = tabela_not_doc_final[tabela_not_doc_final['zone'] == zona].copy()
+                    # Filtra apenas registros desta zona (letra) para notDoc
+                    tabela_zona_not_doc = tabela_not_doc_final_com_zona[tabela_not_doc_final_com_zona['Zona_Letra'] == zona_letra].copy()
                     tabela_zona_not_doc['country'] = pais_importacao
                     tabela_zona_not_doc['iso'] = iso_importacao
+                    # Remove colunas auxiliares
+                    tabela_zona_not_doc.drop(columns=['Tipo', 'range_start', 'Zona_Letra'], inplace=True, errors='ignore')
                     
-                    # Nome do arquivo: Cliente_ZonaX_transportadora_Servico_notDocTable_Plano
-                    caminho_base_zona_not_doc = f"{prefixo_cliente}Zona{zona}_{transportadora_lower}_{nome_aba_limpo}_notDocTable"
+                    # Nome do arquivo: Cliente_ZonaA_transportadora_Servico_notDocTable_Plano
+                    caminho_base_zona_not_doc = f"{prefixo_cliente}Zona{zona_letra}_{transportadora_lower}_{nome_aba_limpo}_notDocTable"
                     arquivos_zona_not_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_zona_not_doc, caminho_base_zona_not_doc, adicionar_margem)
                     todos_os_arquivos_finais.extend(arquivos_zona_not_doc)
                     total_arquivos_import += len(arquivos_zona_not_doc)
                     
-                    print(f"   - Zona {zona}: {len(tabela_zona_doc)} registros (doc), {len(tabela_zona_not_doc)} registros (notDoc)")
+                    print(f"   - Zona {zona_letra}: {len(tabela_zona_doc)} registros (doc), {len(tabela_zona_not_doc)} registros (notDoc)")
                 
                 print(f"   - Total de arquivos de importação gerados: {total_arquivos_import}")
             
