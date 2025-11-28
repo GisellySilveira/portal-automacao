@@ -232,7 +232,7 @@ def aplicar_margens_e_criar_arquivos_em_memoria(df_base, nome_base_arquivo, adic
 
 
 # --- FUNÇÃO PRINCIPAL DE PROCESSAMENTO ---
-def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome_cliente='', adicionar_margem=True, taxa_conversao=1.0, incremento_peso=0.1, converter_lb_para_kg=False):
+def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome_cliente='', adicionar_margem=True, taxa_conversao=1.0, incremento_peso=0.1, converter_lb_para_kg=False, markups_por_servico=None, gerar_importacao=False, pais_importacao=None, iso_importacao=None):
     """
     Processa arquivo Excel de tabelas de frete de acordo com a transportadora escolhida
     
@@ -244,6 +244,10 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
         taxa_conversao: Taxa de conversão de moeda (ex: 1.17 para converter EUR para USD)
         incremento_peso: Incremento de peso em kg (0.1 para 100g, 0.5 para 500g, 1.0 para 1kg)
         converter_lb_para_kg: Se True, converte pesos de libras (lb) para quilogramas (kg)
+        markups_por_servico: Dicionário com markups por serviço (ex: {'Priority': 1.15, 'Economy': 1.20})
+        gerar_importacao: Se True, gera tabela de importação com país único
+        pais_importacao: Nome do país de destino para tabela de importação
+        iso_importacao: Código ISO do país para tabela de importação
     
     Returns:
         Lista de dicionários com {'nome': nome_arquivo, 'dados': conteudo_csv}
@@ -498,6 +502,13 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
                 print(f"   - Aplicando taxa de conversão de moeda: {taxa_conversao}")
                 df_precos['price'] = df_precos['price'] * taxa_conversao
             
+            # Aplica markup personalizado por serviço se configurado
+            if markups_por_servico and nome_da_aba in markups_por_servico:
+                markup = markups_por_servico[nome_da_aba]
+                if markup != 1.0:
+                    print(f"   - Aplicando markup de {markup:.2%} para {nome_da_aba}")
+                    df_precos['price'] = df_precos['price'] * markup
+            
             df_precos['price'] = df_precos['price'].round(2)
             
             # Faz merge com as zonas
@@ -538,9 +549,15 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
                 if converter_lb_para_kg:
                     print("   - Convertendo pesos das regras incrementais de lb para kg...")
                     fator_conversao_lb_para_kg = 0.453592
+                    # Define precisão baseada no incremento
+                    if incremento_peso == 1.0:
+                        precisao_conversao = 0  # Sem decimais para incremento de 1kg
+                    else:
+                        precisao_conversao = 1  # Uma casa decimal para 0.1 e 0.5 kg
+                    
                     for regra in regras_incrementais:
-                        regra['peso_inicial'] = round(regra['peso_inicial'] * fator_conversao_lb_para_kg, 1)
-                        regra['peso_final'] = round(regra['peso_final'] * fator_conversao_lb_para_kg, 1)
+                        regra['peso_inicial'] = round(regra['peso_inicial'] * fator_conversao_lb_para_kg, precisao_conversao)
+                        regra['peso_final'] = round(regra['peso_final'] * fator_conversao_lb_para_kg, precisao_conversao)
                 
                 if incremento_peso == 0.1:
                     print("   - Aplicando regras incrementais (a cada 100g = 0.1 kg)...")
@@ -588,6 +605,30 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
                 
             arquivos_not_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_not_doc_final, caminho_base_not_doc, adicionar_margem)
             todos_os_arquivos_finais.extend(arquivos_not_doc)
+            
+            # Gera tabela de importação se solicitado
+            if gerar_importacao and pais_importacao and iso_importacao:
+                print(f"\n   - Gerando tabela de importação para {pais_importacao} ({iso_importacao})...")
+                
+                # Cria tabela de importação para doc
+                tabela_import_doc = tabela_doc_final.copy()
+                tabela_import_doc['country'] = pais_importacao
+                tabela_import_doc['iso'] = iso_importacao
+                
+                caminho_base_import_doc = f"{nome_cliente_limpo}doc_{transportadora_lower}Table_{nome_aba_limpo}_Import"
+                arquivos_import_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_import_doc, caminho_base_import_doc, adicionar_margem)
+                todos_os_arquivos_finais.extend(arquivos_import_doc)
+                
+                # Cria tabela de importação para notDoc
+                tabela_import_not_doc = tabela_not_doc_final.copy()
+                tabela_import_not_doc['country'] = pais_importacao
+                tabela_import_not_doc['iso'] = iso_importacao
+                
+                caminho_base_import_not_doc = f"{nome_cliente_limpo}notDoc_{transportadora_lower}Table_{nome_aba_limpo}_Import"
+                arquivos_import_not_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_import_not_doc, caminho_base_import_not_doc, adicionar_margem)
+                todos_os_arquivos_finais.extend(arquivos_import_not_doc)
+                
+                print(f"   - Tabela de importação gerada: {len(tabela_import_doc)} registros (doc), {len(tabela_import_not_doc)} registros (notDoc)")
             
             print(f"\n   [OK] Aba '{nome_da_aba}' processada com sucesso!")
             print(f"   - Documentos: {len(tabela_doc_final)} registros")

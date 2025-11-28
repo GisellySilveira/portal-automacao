@@ -109,6 +109,26 @@ elif escolha_topico == "Tabelas de Frete":
                 converter_peso_fedex = st.checkbox("🔄 lb → kg", value=False, key="conv_peso_fedex",
                                                    help="Converte pesos de libras para quilogramas")
             
+            # Opções avançadas
+            with st.expander("⚙️ Configurações Avançadas"):
+                st.markdown("### 📊 Markups Personalizados por Serviço")
+                col_priority, col_economy, col_cp = st.columns(3)
+                with col_priority:
+                    markup_priority = st.number_input("Priority (%)", min_value=0.0, max_value=500.0, value=100.0, step=5.0, key="markup_priority_fedex", help="100 = sem markup, 115 = +15%")
+                with col_economy:
+                    markup_economy = st.number_input("Economy (%)", min_value=0.0, max_value=500.0, value=100.0, step=5.0, key="markup_economy_fedex", help="100 = sem markup, 120 = +20%")
+                with col_cp:
+                    markup_cp = st.number_input("CP (%)", min_value=0.0, max_value=500.0, value=100.0, step=5.0, key="markup_cp_fedex", help="100 = sem markup, 110 = +10%")
+                
+                st.markdown("### 🌍 Tabela de Importação")
+                gerar_importacao_fedex = st.checkbox("Gerar tabela de importação", value=False, key="import_fedex", help="Gera tabela por zona com país único de destino")
+                if gerar_importacao_fedex:
+                    col_pais_import, col_iso_import = st.columns(2)
+                    with col_pais_import:
+                        pais_importacao_fedex = st.text_input("País de destino:", value="Brazil", key="pais_import_fedex", placeholder="Ex: Brazil, Mexico, Chile")
+                    with col_iso_import:
+                        iso_importacao_fedex = st.text_input("ISO do país:", value="BR", key="iso_import_fedex", placeholder="Ex: BR, MX, CL")
+            
             arquivo_excel_fedex = st.file_uploader("Escolha a planilha FedEx", type=["xlsx", "xls"], key="fedex_excel")
                 
                 # --- BOTÃO E LÓGICA DE PROCESSAMENTO AQUI ---
@@ -119,6 +139,13 @@ elif escolha_topico == "Tabelas de Frete":
                     else:
                         with st.spinner("Aguarde... Processando a planilha FedEx..."):
                             try:
+                                # Prepara markups personalizados por serviço
+                                markups_servicos = {
+                                    'Priority': markup_priority / 100.0,
+                                    'Economy': markup_economy / 100.0,
+                                    'CP': markup_cp / 100.0
+                                }
+                                
                                 arquivos_gerados = processar_arquivo_excel(
                                     arquivo_excel_fedex, 
                                     transportadora='FEDEX',
@@ -126,7 +153,11 @@ elif escolha_topico == "Tabelas de Frete":
                                     adicionar_margem=adicionar_margem_fedex,
                                     taxa_conversao=taxa_conversao_fedex if usar_conversao_fedex else 1.0,
                                     incremento_peso=incremento_fedex,
-                                    converter_lb_para_kg=converter_peso_fedex
+                                    converter_lb_para_kg=converter_peso_fedex,
+                                    markups_por_servico=markups_servicos,
+                                    gerar_importacao=gerar_importacao_fedex,
+                                    pais_importacao=pais_importacao_fedex if gerar_importacao_fedex else None,
+                                    iso_importacao=iso_importacao_fedex if gerar_importacao_fedex else None
                                 )
                                 if arquivos_gerados:
                                     zip_buffer = io.BytesIO()
@@ -193,6 +224,17 @@ elif escolha_topico == "Tabelas de Frete":
                 converter_peso_ups = st.checkbox("🔄 lb → kg", value=False, key="conv_peso_ups",
                                                  help="Converte pesos de libras para quilogramas")
             
+            # Opções avançadas
+            with st.expander("⚙️ Configurações Avançadas"):
+                st.markdown("### 🌍 Tabela de Importação")
+                gerar_importacao_ups = st.checkbox("Gerar tabela de importação", value=False, key="import_ups", help="Gera tabela por zona com país único de destino")
+                if gerar_importacao_ups:
+                    col_pais_import, col_iso_import = st.columns(2)
+                    with col_pais_import:
+                        pais_importacao_ups = st.text_input("País de destino:", value="Brazil", key="pais_import_ups", placeholder="Ex: Brazil, Mexico, Chile")
+                    with col_iso_import:
+                        iso_importacao_ups = st.text_input("ISO do país:", value="BR", key="iso_import_ups", placeholder="Ex: BR, MX, CL")
+            
             arquivo_excel_ups = st.file_uploader("Escolha a planilha UPS", type=["xlsx", "xls"], key="ups_excel")
             
             if arquivo_excel_ups:
@@ -209,7 +251,10 @@ elif escolha_topico == "Tabelas de Frete":
                                     adicionar_margem=adicionar_margem_ups,
                                     taxa_conversao=taxa_conversao_ups if usar_conversao_ups else 1.0,
                                     incremento_peso=incremento_ups,
-                                    converter_lb_para_kg=converter_peso_ups
+                                    converter_lb_para_kg=converter_peso_ups,
+                                    gerar_importacao=gerar_importacao_ups,
+                                    pais_importacao=pais_importacao_ups if gerar_importacao_ups else None,
+                                    iso_importacao=iso_importacao_ups if gerar_importacao_ups else None
                                 )
                                 if arquivos_gerados:
                                     zip_buffer = io.BytesIO()
@@ -276,6 +321,17 @@ elif escolha_topico == "Tabelas de Frete":
                 converter_peso_dhl = st.checkbox("🔄 lb → kg", value=False, key="conv_peso_dhl",
                                                  help="Converte pesos de libras para quilogramas")
             
+            # Opções avançadas
+            with st.expander("⚙️ Configurações Avançadas"):
+                st.markdown("### 🌍 Tabela de Importação")
+                gerar_importacao_dhl = st.checkbox("Gerar tabela de importação", value=False, key="import_dhl", help="Gera tabela por zona com país único de destino")
+                if gerar_importacao_dhl:
+                    col_pais_import, col_iso_import = st.columns(2)
+                    with col_pais_import:
+                        pais_importacao_dhl = st.text_input("País de destino:", value="Brazil", key="pais_import_dhl", placeholder="Ex: Brazil, Mexico, Chile")
+                    with col_iso_import:
+                        iso_importacao_dhl = st.text_input("ISO do país:", value="BR", key="iso_import_dhl", placeholder="Ex: BR, MX, CL")
+            
             arquivo_excel_dhl = st.file_uploader("Escolha a planilha DHL", type=["xlsx", "xls"], key="dhl_excel")
             
             if arquivo_excel_dhl:
@@ -292,7 +348,10 @@ elif escolha_topico == "Tabelas de Frete":
                                     adicionar_margem=adicionar_margem_dhl,
                                     taxa_conversao=taxa_conversao_dhl if usar_conversao_dhl else 1.0,
                                     incremento_peso=incremento_dhl,
-                                    converter_lb_para_kg=converter_peso_dhl
+                                    converter_lb_para_kg=converter_peso_dhl,
+                                    gerar_importacao=gerar_importacao_dhl,
+                                    pais_importacao=pais_importacao_dhl if gerar_importacao_dhl else None,
+                                    iso_importacao=iso_importacao_dhl if gerar_importacao_dhl else None
                                 )
                                 if arquivos_gerados:
                                     zip_buffer = io.BytesIO()
@@ -362,6 +421,17 @@ elif escolha_topico == "Tabelas de Frete":
             converter_peso_outras = st.checkbox("🔄 lb → kg", value=False, key="conv_peso_outras",
                                                help="Converte pesos de libras para quilogramas")
         
+        # Opções avançadas
+        with st.expander("⚙️ Configurações Avançadas"):
+            st.markdown("### 🌍 Tabela de Importação")
+            gerar_importacao_outras = st.checkbox("Gerar tabela de importação", value=False, key="import_outras", help="Gera tabela por zona com país único de destino")
+            if gerar_importacao_outras:
+                col_pais_import, col_iso_import = st.columns(2)
+                with col_pais_import:
+                    pais_importacao_outras = st.text_input("País de destino:", value="Brazil", key="pais_import_outras", placeholder="Ex: Brazil, Mexico, Chile")
+                with col_iso_import:
+                    iso_importacao_outras = st.text_input("ISO do país:", value="BR", key="iso_import_outras", placeholder="Ex: BR, MX, CL")
+        
         # Upload do arquivo
         arquivo_excel_outras = st.file_uploader("Escolha a planilha da transportadora", 
                                                type=["xlsx", "xls"], key="outras_excel")
@@ -382,7 +452,10 @@ elif escolha_topico == "Tabelas de Frete":
                                 adicionar_margem=adicionar_margem_outras,
                                 taxa_conversao=taxa_conversao_outras if usar_conversao_outras else 1.0,
                                 incremento_peso=incremento_outras,
-                                converter_lb_para_kg=converter_peso_outras
+                                converter_lb_para_kg=converter_peso_outras,
+                                gerar_importacao=gerar_importacao_outras,
+                                pais_importacao=pais_importacao_outras if gerar_importacao_outras else None,
+                                iso_importacao=iso_importacao_outras if gerar_importacao_outras else None
                             )
                             if arquivos_gerados:
                                 zip_buffer = io.BytesIO()
