@@ -534,6 +534,14 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
             
             # Aplica regras incrementais com o incremento escolhido
             if regras_incrementais:
+                # Se precisar converter de lb para kg, converte os pesos das regras incrementais também
+                if converter_lb_para_kg:
+                    print("   - Convertendo pesos das regras incrementais de lb para kg...")
+                    fator_conversao_lb_para_kg = 0.453592
+                    for regra in regras_incrementais:
+                        regra['peso_inicial'] = round(regra['peso_inicial'] * fator_conversao_lb_para_kg, 1)
+                        regra['peso_final'] = round(regra['peso_final'] * fator_conversao_lb_para_kg, 1)
+                
                 if incremento_peso == 0.1:
                     print("   - Aplicando regras incrementais (a cada 100g = 0.1 kg)...")
                 elif incremento_peso == 0.5:
