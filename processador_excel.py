@@ -604,29 +604,42 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
             arquivos_not_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_not_doc_final, caminho_base_not_doc, adicionar_margem)
             todos_os_arquivos_finais.extend(arquivos_not_doc)
             
-            # Gera tabela de importação se solicitado
+            # Gera tabela de importação se solicitado (um arquivo por zona)
             if gerar_importacao and pais_importacao and iso_importacao:
-                print(f"\n   - Gerando tabela de importação para {pais_importacao} ({iso_importacao})...")
+                print(f"\n   - Gerando tabelas de importação por zona para {pais_importacao} ({iso_importacao})...")
                 
-                # Cria tabela de importação para doc
-                tabela_import_doc = tabela_doc_final.copy()
-                tabela_import_doc['country'] = pais_importacao
-                tabela_import_doc['iso'] = iso_importacao
+                # Pega todas as zonas únicas
+                zonas_unicas = sorted(tabela_doc_final['zone'].unique())
+                print(f"   - Zonas encontradas: {zonas_unicas}")
                 
-                caminho_base_import_doc = f"{nome_cliente_limpo}doc_{transportadora_lower}Table_{nome_aba_limpo}_Import"
-                arquivos_import_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_import_doc, caminho_base_import_doc, adicionar_margem)
-                todos_os_arquivos_finais.extend(arquivos_import_doc)
+                total_arquivos_import = 0
                 
-                # Cria tabela de importação para notDoc
-                tabela_import_not_doc = tabela_not_doc_final.copy()
-                tabela_import_not_doc['country'] = pais_importacao
-                tabela_import_not_doc['iso'] = iso_importacao
+                for zona in zonas_unicas:
+                    # Filtra apenas registros desta zona para doc
+                    tabela_zona_doc = tabela_doc_final[tabela_doc_final['zone'] == zona].copy()
+                    tabela_zona_doc['country'] = pais_importacao
+                    tabela_zona_doc['iso'] = iso_importacao
+                    
+                    # Nome do arquivo: Cliente_ZonaX_transportadora_docTable_Plano
+                    caminho_base_zona_doc = f"{nome_cliente_limpo}Zona{zona}_{transportadora_lower}_docTable"
+                    arquivos_zona_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_zona_doc, caminho_base_zona_doc, adicionar_margem)
+                    todos_os_arquivos_finais.extend(arquivos_zona_doc)
+                    total_arquivos_import += len(arquivos_zona_doc)
+                    
+                    # Filtra apenas registros desta zona para notDoc
+                    tabela_zona_not_doc = tabela_not_doc_final[tabela_not_doc_final['zone'] == zona].copy()
+                    tabela_zona_not_doc['country'] = pais_importacao
+                    tabela_zona_not_doc['iso'] = iso_importacao
+                    
+                    # Nome do arquivo: Cliente_ZonaX_transportadora_notDocTable_Plano
+                    caminho_base_zona_not_doc = f"{nome_cliente_limpo}Zona{zona}_{transportadora_lower}_notDocTable"
+                    arquivos_zona_not_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_zona_not_doc, caminho_base_zona_not_doc, adicionar_margem)
+                    todos_os_arquivos_finais.extend(arquivos_zona_not_doc)
+                    total_arquivos_import += len(arquivos_zona_not_doc)
+                    
+                    print(f"   - Zona {zona}: {len(tabela_zona_doc)} registros (doc), {len(tabela_zona_not_doc)} registros (notDoc)")
                 
-                caminho_base_import_not_doc = f"{nome_cliente_limpo}notDoc_{transportadora_lower}Table_{nome_aba_limpo}_Import"
-                arquivos_import_not_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_import_not_doc, caminho_base_import_not_doc, adicionar_margem)
-                todos_os_arquivos_finais.extend(arquivos_import_not_doc)
-                
-                print(f"   - Tabela de importação gerada: {len(tabela_import_doc)} registros (doc), {len(tabela_import_not_doc)} registros (notDoc)")
+                print(f"   - Total de arquivos de importação gerados: {total_arquivos_import}")
             
             print(f"\n   [OK] Aba '{nome_da_aba}' processada com sucesso!")
             print(f"   - Documentos: {len(tabela_doc_final)} registros")
