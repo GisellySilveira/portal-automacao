@@ -322,19 +322,24 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
                 # Formato completo: country, iso, zona
                 df_zonas = df_zonas_raw.copy()
                 df_zonas.columns = ['country', 'iso', 'Zona_Letra']
+                # Converte Zona_Letra para string (pode vir como número ou letra)
+                df_zonas['Zona_Letra'] = df_zonas['Zona_Letra'].astype(str)
                 print(f"   - Zonas carregadas de: '{aba_zona}' ({len(df_zonas)} países)")
             else:
                 # Formato simplificado: apenas country e zona - usa banco de países
                 print(f"   - Detectado formato simplificado (sem ISO). Usando banco de países...")
                 df_zonas = processar_tabela_com_banco_paises(df_zonas_raw)
+                # Converte Zona_Letra para string (pode vir como número ou letra)
+                df_zonas['Zona_Letra'] = df_zonas['Zona_Letra'].astype(str)
                 print(f"   - Zonas processadas: {len(df_zonas)} países (ISO adicionado automaticamente)")
             
             # Lê a aba de preços
             df_raw = pd.read_excel(xls, sheet_name=nome_da_aba, header=None)
         
-            # A linha 1 contém as zonas (A, B, C, ...)
+            # A linha 1 contém as zonas (A, B, C, ... ou 1, 2, 3...)
             zonas_disponiveis_raw = df_raw.iloc[1, 1:].dropna().tolist()
-            zonas_disponiveis = [z for z in zonas_disponiveis_raw if z != 'Kgs']
+            # Converte todas as zonas para string (podem ser números ou letras)
+            zonas_disponiveis = [str(z) for z in zonas_disponiveis_raw if str(z) != 'Kgs']
             print(f"   - Zonas de preço encontradas: {zonas_disponiveis}")
             
             # Processa cada seção (Envelope, Pak, Package)
@@ -508,6 +513,10 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
                 df_precos['price'] = df_precos['price'] * taxa_conversao
             
             df_precos['price'] = df_precos['price'].round(2)
+            
+            # Garante que Zona_Letra seja string em ambos DataFrames antes do merge
+            df_precos['Zona_Letra'] = df_precos['Zona_Letra'].astype(str)
+            df_zonas['Zona_Letra'] = df_zonas['Zona_Letra'].astype(str)
             
             # Faz merge com as zonas
             df_final = pd.merge(df_precos, df_zonas, on='Zona_Letra', how='left')

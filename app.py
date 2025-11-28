@@ -356,6 +356,7 @@ elif escolha_topico == "Tabelas de Frete":
     with st.expander("📮 Outras Transportadoras"):
         st.markdown("### Processador Genérico")
         st.info("⚠️ **Atenção:** Esta opção processa qualquer transportadora. Certifique-se de que o arquivo Excel segue o formato padrão.")
+        st.success("✅ **Aceita zonas com LETRAS (A, B, C...) ou NÚMEROS (1, 2, 3...)**")
         
         # Campos de cliente e transportadora
         col_cliente, col_transp = st.columns(2)
@@ -449,12 +450,15 @@ elif escolha_topico == "Tabelas de Frete":
 elif escolha_topico == "Tabela de Importação":
     st.header("🌍 Tabela de Importação por Zona")
     st.info("Esta ferramenta gera tabelas separadas por zona com um país de destino único.")
+    st.success("✅ **Aceita zonas com LETRAS (A, B, C...) ou NÚMEROS (1, 2, 3...)**")
     st.markdown("### Como funciona:")
     st.markdown("""
     - Escolha a transportadora e serviço
     - Defina o país de destino (ex: Brazil, Mexico, Chile)
     - O sistema gerará **um arquivo por zona** com todos os preços daquela zona
     - Todos os registros terão o mesmo país de destino que você escolher
+    - **Zonas com letras:** Gera ZonaA, ZonaB, ZonaC...
+    - **Zonas com números:** Gera Zona1, Zona2, Zona3...
     """)
     
     # Seleção da transportadora
@@ -493,19 +497,42 @@ elif escolha_topico == "Tabela de Importação":
         )
     
     with col2:
-        pais_import = st.text_input(
+        # Dicionário de países comuns
+        paises_comuns = {
+            "Brazil": "BR",
+            "Mexico": "MX",
+            "United States": "US",
+            "Portugal": "PT",
+            "Chile": "CL",
+            "Argentina": "AR",
+            "Colombia": "CO",
+            "Peru": "PE",
+            "Spain": "ES",
+            "Germany": "DE",
+            "France": "FR",
+            "Italy": "IT",
+            "United Kingdom": "GB",
+            "China": "CN",
+            "Japan": "JP",
+            "Canada": "CA"
+        }
+        
+        pais_import = st.selectbox(
             "País de Destino*:",
-            value="Brazil",
-            key="pais_import",
-            placeholder="Ex: Brazil, Mexico, Chile"
+            options=list(paises_comuns.keys()),
+            index=0,  # Brazil como padrão
+            key="pais_import"
         )
     
     with col3:
-        iso_import = st.text_input(
+        # ISO automático baseado no país selecionado
+        iso_import = paises_comuns[pais_import]
+        st.text_input(
             "Código ISO*:",
-            value="BR",
-            key="iso_import",
-            placeholder="Ex: BR, MX, CL"
+            value=iso_import,
+            key="iso_import_display",
+            disabled=True,
+            help="Código gerado automaticamente"
         )
     
     # Opções adicionais
