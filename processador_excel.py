@@ -620,8 +620,8 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
                     tabela_zona_doc['country'] = pais_importacao
                     tabela_zona_doc['iso'] = iso_importacao
                     
-                    # Nome do arquivo: Cliente_ZonaX_transportadora_docTable_Plano
-                    caminho_base_zona_doc = f"{prefixo_cliente}Zona{zona}_{transportadora_lower}_docTable"
+                    # Nome do arquivo: Cliente_ZonaX_transportadora_Servico_docTable_Plano
+                    caminho_base_zona_doc = f"{prefixo_cliente}Zona{zona}_{transportadora_lower}_{nome_aba_limpo}_docTable"
                     arquivos_zona_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_zona_doc, caminho_base_zona_doc, adicionar_margem)
                     todos_os_arquivos_finais.extend(arquivos_zona_doc)
                     total_arquivos_import += len(arquivos_zona_doc)
@@ -631,8 +631,8 @@ def processar_arquivo_excel(arquivo_excel_recebido, transportadora='FEDEX', nome
                     tabela_zona_not_doc['country'] = pais_importacao
                     tabela_zona_not_doc['iso'] = iso_importacao
                     
-                    # Nome do arquivo: Cliente_ZonaX_transportadora_notDocTable_Plano
-                    caminho_base_zona_not_doc = f"{prefixo_cliente}Zona{zona}_{transportadora_lower}_notDocTable"
+                    # Nome do arquivo: Cliente_ZonaX_transportadora_Servico_notDocTable_Plano
+                    caminho_base_zona_not_doc = f"{prefixo_cliente}Zona{zona}_{transportadora_lower}_{nome_aba_limpo}_notDocTable"
                     arquivos_zona_not_doc = aplicar_margens_e_criar_arquivos_em_memoria(tabela_zona_not_doc, caminho_base_zona_not_doc, adicionar_margem)
                     todos_os_arquivos_finais.extend(arquivos_zona_not_doc)
                     total_arquivos_import += len(arquivos_zona_not_doc)
