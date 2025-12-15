@@ -12,3 +12,4 @@ with open('processador_excel.py', 'w', encoding='utf-8') as f:
 
 print('Arquivo reescrito!')
 
+

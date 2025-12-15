@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import io
 import zipfile
+import json
 
 # Tenta importar as funções de processamento. Se não encontrar, define funções de exemplo.
 try:
@@ -12,6 +13,13 @@ except ImportError:
         # Retorna uma lista de arquivos de exemplo para o download funcionar
         return [{'nome': 'exemplo_doc.csv', 'dados': 'exemplo;doc'}, {'nome': 'exemplo_notdoc.csv', 'dados': 'exemplo;notdoc'}]
 
+# Importa o módulo de integração com a API
+try:
+    from api_integration import APIShipSmart
+except ImportError:
+    st.warning("Módulo de integração com API não encontrado.")
+    APIShipSmart = None
+
 # (Aqui entra a importação do processador de PDF quando estiver pronto)
 # try:
 #     from processador_pdf_br import processar_pdf_fedex_br
@@ -19,6 +27,64 @@ except ImportError:
 #     def processar_pdf_fedex_br(file, tipo):
 #         st.warning("Função 'processar_pdf_fedex_br' não encontrada.")
 #         return []
+
+
+# --- FUNÇÕES AUXILIARES ---
+def carregar_config_api():
+    """Carrega configurações da API do arquivo JSON"""
+    try:
+        with open("config_api.json", "r") as f:
+            return json.load(f)
+    except:
+        return {
+            "api_url": "https://bck.shipsmart.com.br/api",
+            "token": "",
+            "password": "",
+            "tipo_config": 4,
+            "descricao_padrao": "Tabela importada via Portal de Automação"
+        }
+
+def salvar_config_api(config):
+    """Salva configurações da API no arquivo JSON"""
+    try:
+        with open("config_api.json", "w") as f:
+            json.dump(config, f, indent=4)
+        return True
+    except:
+        return False
+
+def enviar_para_api(arquivos_gerados, transportadora, nome_cliente):
+    """Envia arquivos processados para a API ShipSmart"""
+    config = carregar_config_api()
+    
+    if not config.get("token") or not config.get("password"):
+        st.error("❌ Configure o token e senha da API nas configurações da barra lateral")
+        return None
+    
+    # Inicializa cliente da API
+    api = APIShipSmart(
+        base_url=config.get("api_url", "https://bck.shipsmart.com.br/api"),
+        token=config.get("token")
+    )
+    
+    # Verifica senha
+    with st.spinner("🔐 Verificando credenciais..."):
+        verificacao = api.verificar_senha(config.get("password"))
+        if verificacao.get("status") != "success":
+            st.error(f"❌ Erro na autenticação: {verificacao.get('message')}")
+            return None
+    
+    # Envia arquivos
+    descricao_base = f"{transportadora} - {nome_cliente}"
+    
+    with st.spinner(f"📤 Enviando {len(arquivos_gerados)} arquivo(s) para o sistema..."):
+        resultados = api.enviar_multiplas_tabelas(
+            arquivos=arquivos_gerados,
+            tipo=config.get("tipo_config", 4),
+            descricao_base=descricao_base
+        )
+    
+    return resultados
 
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -33,6 +99,56 @@ with st.sidebar:
         "Selecione o Módulo:",
         ("Página Inicial", "Tabelas de Frete", "Tabela de Importação", "RECOM", "Troquecommerce")
     )
+    
+    st.markdown("---")
+    
+    # Configurações da API
+    with st.expander("⚙️ Configurar API ShipSmart"):
+        st.markdown("### 🔐 Credenciais")
+        
+        config_api = carregar_config_api()
+        
+        api_token = st.text_input(
+            "Token de Autenticação:",
+            value=config_api.get("token", ""),
+            type="password",
+            help="Bearer token para autenticação na API",
+            key="api_token_input"
+        )
+        
+        api_password = st.text_input(
+            "Senha do Sistema:",
+            value=config_api.get("password", ""),
+            type="password",
+            help="Senha para verificação de acesso",
+            key="api_password_input"
+        )
+        
+        api_url = st.text_input(
+            "URL da API:",
+            value=config_api.get("api_url", "https://bck.shipsmart.com.br/api"),
+            help="URL base da API ShipSmart",
+            key="api_url_input"
+        )
+        
+        if st.button("💾 Salvar Configurações", key="salvar_config_api"):
+            nova_config = {
+                "api_url": api_url,
+                "token": api_token,
+                "password": api_password,
+                "tipo_config": config_api.get("tipo_config", 4),
+                "descricao_padrao": config_api.get("descricao_padrao", "Tabela importada via Portal de Automação")
+            }
+            if salvar_config_api(nova_config):
+                st.success("✅ Configurações salvas com sucesso!")
+            else:
+                st.error("❌ Erro ao salvar configurações")
+        
+        # Verifica se as credenciais estão configuradas
+        if api_token and api_password:
+            st.success("✅ API configurada")
+        else:
+            st.warning("⚠️ Configure o token e senha para enviar tabelas automaticamente")
 
 st.markdown("---")
 
@@ -157,19 +273,49 @@ elif escolha_topico == "Tabelas de Frete":
                                         iso_importacao=None
                                     )
                                 if arquivos_gerados:
+                                    # Salva arquivos gerados na sessão
+                                    st.session_state['arquivos_fedex'] = arquivos_gerados
+                                    st.session_state['transportadora_fedex'] = 'FEDEX'
+                                    st.session_state['cliente_fedex'] = nome_cliente_fedex.strip()
+                                    
                                     zip_buffer = io.BytesIO()
                                     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zf:
                                         for arquivo in arquivos_gerados:
                                             zf.writestr(arquivo['nome'], arquivo['dados'])
                                     
-                                        st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
-                                    st.download_button(
-                                            label="📥 Baixar Todos os Arquivos (.zip)", 
+                                    st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
+                                    
+                                    col_download, col_api = st.columns(2)
+                                    
+                                    with col_download:
+                                        st.download_button(
+                                            label="📥 Baixar Arquivos (.zip)", 
                                             data=zip_buffer.getvalue(),
                                             file_name="resultados_FedEx.zip", 
                                             mime="application/zip",
                                             use_container_width=True
-                                    )
+                                        )
+                                    
+                                    with col_api:
+                                        if st.button("🚀 Enviar para o Sistema", key="enviar_api_fedex", use_container_width=True):
+                                            resultados = enviar_para_api(
+                                                arquivos_gerados,
+                                                'FEDEX',
+                                                nome_cliente_fedex.strip()
+                                            )
+                                            
+                                            if resultados:
+                                                sucessos = sum(1 for r in resultados if r['sucesso'])
+                                                if sucessos == len(resultados):
+                                                    st.success(f"✅ Todos os {len(resultados)} arquivos foram enviados com sucesso!")
+                                                    st.balloons()
+                                                else:
+                                                    st.warning(f"⚠️ {sucessos}/{len(resultados)} arquivos enviados com sucesso")
+                                                
+                                                with st.expander("📋 Detalhes do envio"):
+                                                    for resultado in resultados:
+                                                        status_icon = "✅" if resultado['sucesso'] else "❌"
+                                                        st.write(f"{status_icon} **{resultado['arquivo']}**: {resultado['message']}")
                                 else:
                                     st.warning("Nenhum arquivo foi gerado.")
                             except Exception as e:
@@ -250,13 +396,38 @@ elif escolha_topico == "Tabelas de Frete":
                                             zf.writestr(arquivo['nome'], arquivo['dados'])
                                     
                                     st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
-                                    st.download_button(
-                                        label="📥 Baixar Todos os Arquivos (.zip)", 
-                                        data=zip_buffer.getvalue(),
-                                        file_name="resultados_UPS.zip", 
-                                        mime="application/zip",
-                                        use_container_width=True
-                                    )
+                                    
+                                    col_download, col_api = st.columns(2)
+                                    
+                                    with col_download:
+                                        st.download_button(
+                                            label="📥 Baixar Arquivos (.zip)", 
+                                            data=zip_buffer.getvalue(),
+                                            file_name="resultados_UPS.zip", 
+                                            mime="application/zip",
+                                            use_container_width=True
+                                        )
+                                    
+                                    with col_api:
+                                        if st.button("🚀 Enviar para o Sistema", key="enviar_api_ups", use_container_width=True):
+                                            resultados = enviar_para_api(
+                                                arquivos_gerados,
+                                                'UPS',
+                                                nome_cliente_ups.strip()
+                                            )
+                                            
+                                            if resultados:
+                                                sucessos = sum(1 for r in resultados if r['sucesso'])
+                                                if sucessos == len(resultados):
+                                                    st.success(f"✅ Todos os {len(resultados)} arquivos foram enviados com sucesso!")
+                                                    st.balloons()
+                                                else:
+                                                    st.warning(f"⚠️ {sucessos}/{len(resultados)} arquivos enviados com sucesso")
+                                                
+                                                with st.expander("📋 Detalhes do envio"):
+                                                    for resultado in resultados:
+                                                        status_icon = "✅" if resultado['sucesso'] else "❌"
+                                                        st.write(f"{status_icon} **{resultado['arquivo']}**: {resultado['message']}")
                                 else:
                                     st.warning("Nenhum arquivo foi gerado.")
                             except Exception as e:
@@ -337,13 +508,38 @@ elif escolha_topico == "Tabelas de Frete":
                                             zf.writestr(arquivo['nome'], arquivo['dados'])
                                     
                                     st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
-                                    st.download_button(
-                                        label="📥 Baixar Todos os Arquivos (.zip)", 
-                                        data=zip_buffer.getvalue(),
-                                        file_name="resultados_DHL.zip", 
-                                        mime="application/zip",
-                                        use_container_width=True
-                                    )
+                                    
+                                    col_download, col_api = st.columns(2)
+                                    
+                                    with col_download:
+                                        st.download_button(
+                                            label="📥 Baixar Arquivos (.zip)", 
+                                            data=zip_buffer.getvalue(),
+                                            file_name="resultados_DHL.zip", 
+                                            mime="application/zip",
+                                            use_container_width=True
+                                        )
+                                    
+                                    with col_api:
+                                        if st.button("🚀 Enviar para o Sistema", key="enviar_api_dhl", use_container_width=True):
+                                            resultados = enviar_para_api(
+                                                arquivos_gerados,
+                                                'DHL',
+                                                nome_cliente_dhl.strip()
+                                            )
+                                            
+                                            if resultados:
+                                                sucessos = sum(1 for r in resultados if r['sucesso'])
+                                                if sucessos == len(resultados):
+                                                    st.success(f"✅ Todos os {len(resultados)} arquivos foram enviados com sucesso!")
+                                                    st.balloons()
+                                                else:
+                                                    st.warning(f"⚠️ {sucessos}/{len(resultados)} arquivos enviados com sucesso")
+                                                
+                                                with st.expander("📋 Detalhes do envio"):
+                                                    for resultado in resultados:
+                                                        status_icon = "✅" if resultado['sucesso'] else "❌"
+                                                        st.write(f"{status_icon} **{resultado['arquivo']}**: {resultado['message']}")
                                 else:
                                     st.warning("Nenhum arquivo foi gerado.")
                             except Exception as e:
@@ -432,13 +628,38 @@ elif escolha_topico == "Tabelas de Frete":
                                         zf.writestr(arquivo['nome'], arquivo['dados'])
                                 
                                 st.success(f"✅ Planilha processada com sucesso! {len(arquivos_gerados)} arquivos gerados.")
-                                st.download_button(
-                                    label="📥 Baixar Todos os Arquivos (.zip)", 
-                                    data=zip_buffer.getvalue(),
-                                    file_name="resultados_Outras.zip", 
-                                    mime="application/zip",
-                                    use_container_width=True
-                                )
+                                
+                                col_download, col_api = st.columns(2)
+                                
+                                with col_download:
+                                    st.download_button(
+                                        label="📥 Baixar Arquivos (.zip)", 
+                                        data=zip_buffer.getvalue(),
+                                        file_name="resultados_Outras.zip", 
+                                        mime="application/zip",
+                                        use_container_width=True
+                                    )
+                                
+                                with col_api:
+                                    if st.button("🚀 Enviar para o Sistema", key="enviar_api_outras", use_container_width=True):
+                                        resultados = enviar_para_api(
+                                            arquivos_gerados,
+                                            nome_transportadora_outras.strip().upper(),
+                                            nome_cliente_outras.strip()
+                                        )
+                                        
+                                        if resultados:
+                                            sucessos = sum(1 for r in resultados if r['sucesso'])
+                                            if sucessos == len(resultados):
+                                                st.success(f"✅ Todos os {len(resultados)} arquivos foram enviados com sucesso!")
+                                                st.balloons()
+                                            else:
+                                                st.warning(f"⚠️ {sucessos}/{len(resultados)} arquivos enviados com sucesso")
+                                            
+                                            with st.expander("📋 Detalhes do envio"):
+                                                for resultado in resultados:
+                                                    status_icon = "✅" if resultado['sucesso'] else "❌"
+                                                    st.write(f"{status_icon} **{resultado['arquivo']}**: {resultado['message']}")
                             else:
                                 st.warning("Nenhum arquivo foi gerado.")
                         except Exception as e:
@@ -630,13 +851,38 @@ elif escolha_topico == "Tabela de Importação":
                                         zf.writestr(arquivo['nome'], arquivo['dados'])
                                 
                                 st.success(f"✅ Tabela de importação gerada com sucesso! {len(arquivos_importacao)} arquivos.")
-                                st.download_button(
-                                    label="📥 Baixar Tabela de Importação (.zip)",
-                                    data=zip_buffer.getvalue(),
-                                    file_name=f"importacao_{pais_import}_{transportadora_final}.zip",
-                                    mime="application/zip",
-                                    use_container_width=True
-                                )
+                                
+                                col_download, col_api = st.columns(2)
+                                
+                                with col_download:
+                                    st.download_button(
+                                        label="📥 Baixar Tabela (.zip)",
+                                        data=zip_buffer.getvalue(),
+                                        file_name=f"importacao_{pais_import}_{transportadora_final}.zip",
+                                        mime="application/zip",
+                                        use_container_width=True
+                                    )
+                                
+                                with col_api:
+                                    if st.button("🚀 Enviar para o Sistema", key="enviar_api_import", use_container_width=True):
+                                        resultados = enviar_para_api(
+                                            arquivos_importacao,
+                                            transportadora_final,
+                                            nome_cliente_import.strip()
+                                        )
+                                        
+                                        if resultados:
+                                            sucessos = sum(1 for r in resultados if r['sucesso'])
+                                            if sucessos == len(resultados):
+                                                st.success(f"✅ Todos os {len(resultados)} arquivos foram enviados com sucesso!")
+                                                st.balloons()
+                                            else:
+                                                st.warning(f"⚠️ {sucessos}/{len(resultados)} arquivos enviados com sucesso")
+                                            
+                                            with st.expander("📋 Detalhes do envio"):
+                                                for resultado in resultados:
+                                                    status_icon = "✅" if resultado['sucesso'] else "❌"
+                                                    st.write(f"{status_icon} **{resultado['arquivo']}**: {resultado['message']}")
                             else:
                                 st.warning("⚠️ Nenhum arquivo de importação foi gerado.")
                         else:
