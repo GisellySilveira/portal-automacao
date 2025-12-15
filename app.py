@@ -53,7 +53,7 @@ def salvar_config_api(config):
     except:
         return False
 
-def enviar_para_api(arquivos_gerados, transportadora, nome_cliente):
+def enviar_para_api(arquivos_gerados, transportadora, nome_cliente, modalidade=""):
     """Envia arquivos processados para a API ShipSmart"""
     config = carregar_config_api()
     
@@ -73,15 +73,16 @@ def enviar_para_api(arquivos_gerados, transportadora, nome_cliente):
         if verificacao.get("status") != "success":
             st.error(f"❌ Erro na autenticação: {verificacao.get('message')}")
             return None
+        st.success("✅ Credenciais verificadas!")
     
-    # Envia arquivos
-    descricao_base = f"{transportadora} - {nome_cliente}"
-    
+    # Envia arquivos com formato correto
     with st.spinner(f"📤 Enviando {len(arquivos_gerados)} arquivo(s) para o sistema..."):
         resultados = api.enviar_multiplas_tabelas(
             arquivos=arquivos_gerados,
-            tipo=config.get("tipo_config", 4),
-            descricao_base=descricao_base
+            transportadora=transportadora,
+            nome_cliente=nome_cliente,
+            modalidade=modalidade,
+            ano="2026"
         )
     
     return resultados
@@ -132,8 +133,14 @@ with st.sidebar:
         )
         
         if st.button("💾 Salvar Configurações", key="salvar_config_api"):
+            # Valida a URL da API - remove endpoints incorretos
+            api_url_limpa = api_url.rstrip('/')
+            if '/auth/verify-pass' in api_url_limpa or '/configuracoes' in api_url_limpa:
+                api_url_limpa = "https://bck.shipsmart.com.br/api"
+                st.warning("⚠️ URL corrigida! Use apenas: https://bck.shipsmart.com.br/api")
+            
             nova_config = {
-                "api_url": api_url,
+                "api_url": api_url_limpa,
                 "token": api_token,
                 "password": api_password,
                 "tipo_config": config_api.get("tipo_config", 4),
@@ -141,6 +148,7 @@ with st.sidebar:
             }
             if salvar_config_api(nova_config):
                 st.success("✅ Configurações salvas com sucesso!")
+                st.info("💡 URL da API: " + api_url_limpa)
             else:
                 st.error("❌ Erro ao salvar configurações")
         
@@ -298,10 +306,22 @@ elif escolha_topico == "Tabelas de Frete":
                                     
                                     with col_api:
                                         if st.button("🚀 Enviar para o Sistema", key="enviar_api_fedex", use_container_width=True):
+                                            # Identifica modalidade predominante dos serviços selecionados
+                                            modalidade_fedex = ""
+                                            if processar_priority and not processar_economy and not processar_cp:
+                                                modalidade_fedex = "Priority"
+                                            elif processar_economy and not processar_priority and not processar_cp:
+                                                modalidade_fedex = "Economy"
+                                            elif processar_cp and not processar_priority and not processar_economy:
+                                                modalidade_fedex = "CP"
+                                            else:
+                                                modalidade_fedex = "Multi"
+                                            
                                             resultados = enviar_para_api(
                                                 arquivos_gerados,
                                                 'FEDEX',
-                                                nome_cliente_fedex.strip()
+                                                nome_cliente_fedex.strip(),
+                                                modalidade_fedex
                                             )
                                             
                                             if resultados:
@@ -315,7 +335,11 @@ elif escolha_topico == "Tabelas de Frete":
                                                 with st.expander("📋 Detalhes do envio"):
                                                     for resultado in resultados:
                                                         status_icon = "✅" if resultado['sucesso'] else "❌"
-                                                        st.write(f"{status_icon} **{resultado['arquivo']}**: {resultado['message']}")
+                                                        st.write(f"{status_icon} **{resultado['arquivo']}**")
+                                                        st.write(f"   📝 Descrição: {resultado['descricao']}")
+                                                        st.write(f"   📁 Tipo: {resultado['tipo']}")
+                                                        st.write(f"   💬 Resposta: {resultado['message']}")
+                                                        st.write("---")
                                 else:
                                     st.warning("Nenhum arquivo foi gerado.")
                             except Exception as e:
@@ -413,7 +437,8 @@ elif escolha_topico == "Tabelas de Frete":
                                             resultados = enviar_para_api(
                                                 arquivos_gerados,
                                                 'UPS',
-                                                nome_cliente_ups.strip()
+                                                nome_cliente_ups.strip(),
+                                                modalidade=""
                                             )
                                             
                                             if resultados:
@@ -427,7 +452,11 @@ elif escolha_topico == "Tabelas de Frete":
                                                 with st.expander("📋 Detalhes do envio"):
                                                     for resultado in resultados:
                                                         status_icon = "✅" if resultado['sucesso'] else "❌"
-                                                        st.write(f"{status_icon} **{resultado['arquivo']}**: {resultado['message']}")
+                                                        st.write(f"{status_icon} **{resultado['arquivo']}**")
+                                                        st.write(f"   📝 Descrição: {resultado['descricao']}")
+                                                        st.write(f"   📁 Tipo: {resultado['tipo']}")
+                                                        st.write(f"   💬 Resposta: {resultado['message']}")
+                                                        st.write("---")
                                 else:
                                     st.warning("Nenhum arquivo foi gerado.")
                             except Exception as e:
@@ -525,7 +554,8 @@ elif escolha_topico == "Tabelas de Frete":
                                             resultados = enviar_para_api(
                                                 arquivos_gerados,
                                                 'DHL',
-                                                nome_cliente_dhl.strip()
+                                                nome_cliente_dhl.strip(),
+                                                modalidade="Express"
                                             )
                                             
                                             if resultados:
@@ -539,7 +569,11 @@ elif escolha_topico == "Tabelas de Frete":
                                                 with st.expander("📋 Detalhes do envio"):
                                                     for resultado in resultados:
                                                         status_icon = "✅" if resultado['sucesso'] else "❌"
-                                                        st.write(f"{status_icon} **{resultado['arquivo']}**: {resultado['message']}")
+                                                        st.write(f"{status_icon} **{resultado['arquivo']}**")
+                                                        st.write(f"   📝 Descrição: {resultado['descricao']}")
+                                                        st.write(f"   📁 Tipo: {resultado['tipo']}")
+                                                        st.write(f"   💬 Resposta: {resultado['message']}")
+                                                        st.write("---")
                                 else:
                                     st.warning("Nenhum arquivo foi gerado.")
                             except Exception as e:
@@ -645,7 +679,8 @@ elif escolha_topico == "Tabelas de Frete":
                                         resultados = enviar_para_api(
                                             arquivos_gerados,
                                             nome_transportadora_outras.strip().upper(),
-                                            nome_cliente_outras.strip()
+                                            nome_cliente_outras.strip(),
+                                            modalidade=""
                                         )
                                         
                                         if resultados:
@@ -659,7 +694,11 @@ elif escolha_topico == "Tabelas de Frete":
                                             with st.expander("📋 Detalhes do envio"):
                                                 for resultado in resultados:
                                                     status_icon = "✅" if resultado['sucesso'] else "❌"
-                                                    st.write(f"{status_icon} **{resultado['arquivo']}**: {resultado['message']}")
+                                                    st.write(f"{status_icon} **{resultado['arquivo']}**")
+                                                    st.write(f"   📝 Descrição: {resultado['descricao']}")
+                                                    st.write(f"   📁 Tipo: {resultado['tipo']}")
+                                                    st.write(f"   💬 Resposta: {resultado['message']}")
+                                                    st.write("---")
                             else:
                                 st.warning("Nenhum arquivo foi gerado.")
                         except Exception as e:
@@ -868,7 +907,8 @@ elif escolha_topico == "Tabela de Importação":
                                         resultados = enviar_para_api(
                                             arquivos_importacao,
                                             transportadora_final,
-                                            nome_cliente_import.strip()
+                                            nome_cliente_import.strip(),
+                                            modalidade=servico_import
                                         )
                                         
                                         if resultados:
@@ -882,7 +922,11 @@ elif escolha_topico == "Tabela de Importação":
                                             with st.expander("📋 Detalhes do envio"):
                                                 for resultado in resultados:
                                                     status_icon = "✅" if resultado['sucesso'] else "❌"
-                                                    st.write(f"{status_icon} **{resultado['arquivo']}**: {resultado['message']}")
+                                                    st.write(f"{status_icon} **{resultado['arquivo']}**")
+                                                    st.write(f"   📝 Descrição: {resultado['descricao']}")
+                                                    st.write(f"   📁 Tipo: {resultado['tipo']}")
+                                                    st.write(f"   💬 Resposta: {resultado['message']}")
+                                                    st.write("---")
                             else:
                                 st.warning("⚠️ Nenhum arquivo de importação foi gerado.")
                         else:

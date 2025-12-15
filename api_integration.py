@@ -64,7 +64,9 @@ class APIShipSmart:
         Args:
             arquivo_conteudo: Conteúdo do arquivo em bytes
             nome_arquivo: Nome do arquivo
-            tipo: Tipo da configuração (padrão: 4)
+            tipo: Tipo da configuração
+                  3 = Frete Documentos (arquivos com 'doc' no nome)
+                  4 = Frete Não Documentos (arquivos com 'notdoc' no nome)
             descricao: Descrição da tabela
             
         Returns:
@@ -78,6 +80,14 @@ class APIShipSmart:
         
         url = f"{self.base_url}/configuracoes"
         
+        # Determina o tipo automaticamente baseado no nome do arquivo
+        if 'notdoc' in nome_arquivo.lower():
+            tipo_final = 4  # Frete Não Documentos
+        elif 'doc' in nome_arquivo.lower():
+            tipo_final = 3  # Frete Documentos
+        else:
+            tipo_final = tipo  # Usa o tipo fornecido
+        
         # Prepara o arquivo
         files = {
             'arquivo': (nome_arquivo, arquivo_conteudo, 'text/csv')
@@ -85,7 +95,7 @@ class APIShipSmart:
         
         # Prepara os dados do formulário
         data = {
-            'tipo': str(tipo),
+            'tipo': str(tipo_final),
             'descricao': descricao
         }
         
@@ -108,16 +118,20 @@ class APIShipSmart:
     def enviar_multiplas_tabelas(
         self,
         arquivos: list,
-        tipo: int = 4,
-        descricao_base: str = ""
+        transportadora: str,
+        nome_cliente: str,
+        modalidade: str = "",
+        ano: str = "2026"
     ) -> list:
         """
-        Envia múltiplas tabelas para a API
+        Envia múltiplas tabelas para a API com descrição formatada
         
         Args:
             arquivos: Lista de dicionários com 'nome' e 'dados'
-            tipo: Tipo da configuração
-            descricao_base: Descrição base (será complementada com nome do arquivo)
+            transportadora: Nome da transportadora (FEDEX, UPS, DHL, etc)
+            nome_cliente: Nome do cliente
+            modalidade: Modalidade (Priority, Economy, CP, etc) - opcional
+            ano: Ano da margem (padrão: 2026)
             
         Returns:
             Lista com resultados de cada envio
@@ -134,7 +148,40 @@ class APIShipSmart:
             else:
                 dados_bytes = dados
             
-            descricao = f"{descricao_base} - {nome}" if descricao_base else nome
+            # Extrai informações do nome do arquivo para a descrição
+            # Identifica se tem margem no nome
+            tem_margem = any(x in nome.lower() for x in ['lap', 'special', 'basic', 'margem'])
+            margem_texto = "margem" if tem_margem else "sem margem"
+            
+            # Tenta identificar a modalidade do nome do arquivo se não foi fornecida
+            modalidade_arquivo = modalidade
+            if not modalidade_arquivo:
+                if 'priority' in nome.lower():
+                    modalidade_arquivo = 'Priority'
+                elif 'economy' in nome.lower():
+                    modalidade_arquivo = 'Economy'
+                elif 'cp' in nome.lower():
+                    modalidade_arquivo = 'CP'
+                elif 'express' in nome.lower():
+                    modalidade_arquivo = 'Express'
+                elif 'standard' in nome.lower():
+                    modalidade_arquivo = 'Standard'
+                else:
+                    modalidade_arquivo = 'Standard'
+            
+            # Formato: [Nome do Cliente] Transportadora modalidade margem 2026
+            descricao = f"[{nome_cliente}] {transportadora} {modalidade_arquivo} {margem_texto} {ano}"
+            
+            # Determina o tipo baseado se é doc ou notdoc
+            if 'notdoc' in nome.lower():
+                tipo = 4  # Frete Não Documentos
+                tipo_texto = "Frete Não Documentos"
+            elif 'doc' in nome.lower():
+                tipo = 3  # Frete Documentos
+                tipo_texto = "Frete Documentos"
+            else:
+                tipo = 4  # Padrão
+                tipo_texto = "Frete Não Documentos"
             
             resultado = self.enviar_tabela(
                 arquivo_conteudo=dados_bytes,
@@ -145,6 +192,8 @@ class APIShipSmart:
             
             resultados.append({
                 'arquivo': nome,
+                'tipo': tipo_texto,
+                'descricao': descricao,
                 'status': resultado.get('status'),
                 'message': resultado.get('message'),
                 'sucesso': resultado.get('status') == 'success'
