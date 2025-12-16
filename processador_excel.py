@@ -40,10 +40,11 @@ CONFIGURACOES_TRANSPORTADORAS = {
         }
     },
     'UPS': {
-        'abas_preco': ['Express', 'Standard'],
+        'abas_preco': ['Saver', 'Expedited', 'Ground'],
         'mapa_abas_zonas': {
-            'Express': 'zones express',
-            'Standard': 'zones standard'
+            'Saver': 'zones saver',
+            'Expedited': 'zones expedited',
+            'Ground': 'zones ground'
         },
         'mapa_zonas_priority': {
             'A': 1, 'B': 1, 'C': 2, 'D': 2, 'E': 3, 'F': 3, 'G': 3, 'H': 4,
